@@ -6,6 +6,15 @@ on:
     - cron: "0 23 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -22,7 +31,25 @@ jobs:
       - name: Run screener
         run: python ma_cross_screener.py
 
+      - name: Generate report
+        run: python generate_report.py
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
       - name: Notify on golden cross
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python notify_golden_cross.py
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

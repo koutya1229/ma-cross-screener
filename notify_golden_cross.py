@@ -31,8 +31,16 @@ def build_message(latest_date: str, rows: list) -> str:
 
 
 def build_click_url() -> str | None:
-    server = os.environ.get("GITHUB_SERVER_URL")
+    """GitHub Pages のレポートページへのリンク（owner.github.io/repo/ 形式）。
+    Pages が未設定/未反映の場合に備え、取得できなければ Actions の実行結果に
+    フォールバックする。
+    """
     repo = os.environ.get("GITHUB_REPOSITORY")
+    if repo and "/" in repo:
+        owner, name = repo.split("/", 1)
+        return f"https://{owner}.github.io/{name}/"
+
+    server = os.environ.get("GITHUB_SERVER_URL")
     run_id = os.environ.get("GITHUB_RUN_ID")
     if server and repo and run_id:
         return f"{server}/{repo}/actions/runs/{run_id}"
