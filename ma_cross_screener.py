@@ -8,6 +8,7 @@
   + クロス接近の早期警告
   + シグナルの実運用成績トラッキング（signal_track_record.json に永続化）
   + レポート用チャートデータ出力
+  + セクター別モメンタム（「今どの市場が熱いか」の横断ウォッチ）
 
 必要ライブラリ:
     pip install yfinance pandas numpy
@@ -21,6 +22,7 @@
                               （このCSVを使えば「どの条件が本当に効くか」を後から検証可能）
     ma_cross_approaching.csv  まだクロスしていないが接近中の銘柄
     ma_cross_chart_data.csv   直近シグナルが出た銘柄のEMAチャート用データ
+    ma_cross_momentum.csv     全銘柄の直近5/20営業日リターン（セクター別集計の元データ）
     signal_track_record.json 実運用シグナルの成績記録（累積・要コミット）
 """
 
@@ -40,29 +42,80 @@ TICKERS = [
     # --- 米国 ---
     "SOXL", "SOXS", "SOXX", "SMH",
     "TQQQ", "SQQQ", "QQQ",
-    "SPY", "SPXL",
+    "SPY", "SPXL", "DIA",
     "NVDA", "AMD", "TSM",
+    "AAPL", "MSFT", "GOOGL",  # ハイテク(Nasdaq100)セクターの厚み確保用
     # --- 日本（東証、yfinanceは "XXXX.T" 形式） ---
     "1321.T", "1306.T",   # 日経225連動型上場投信 / TOPIX連動型上場投信
     "1570.T", "1357.T",   # 日経平均レバレッジ / 日経平均ダブルインバース
     "7203.T", "6758.T", "7974.T", "8035.T", "9984.T",  # トヨタ・ソニーG・任天堂・東京エレクトロン・ソフトバンクG
     "8306.T", "9432.T", "6501.T", "8058.T", "9983.T",  # 三菱UFJ・NTT・日立・三菱商事・ファーストリテイリング
     "6861.T", "4063.T", "7267.T", "6098.T", "4568.T",  # キーエンス・信越化学・ホンダ・リクルートHD・第一三共
+    # --- セクター内銘柄数の厚み確保用（各セクター最低3銘柄にするため追加） ---
+    "7269.T",           # スズキ（自動車）
+    "6752.T",           # パナソニックHD（エレクトロニクス）
+    "9433.T",           # KDDI（通信）
+    "8316.T", "8411.T", # 三井住友FG・みずほFG（金融）
+    "8031.T", "8001.T", # 三井物産・伊藤忠商事（商社）
+    "3382.T", "8267.T", # セブン&アイHD・イオン（小売）
+    "6273.T", "6954.T", # SMC・ファナック（精密機器・FA）
+    "4005.T", "4188.T", # 住友化学・三菱ケミカルグループ（化学）
+    "4324.T", "2168.T", # 電通グループ・パソナグループ（サービス・人材）
+    "4502.T", "4523.T", # 武田薬品工業・エーザイ（製薬）
+    "9766.T", "6460.T", # コナミグループ・セガサミーHD（ゲーム・エンタメ）
 ]
 
 # 商品タイプの分類（レバレッジ・インバース商品は値動きの性質が異なるため区別する）
 TICKER_CATEGORY = {
     "SOXL": "leveraged_bull", "TQQQ": "leveraged_bull", "SPXL": "leveraged_bull",
     "SOXS": "leveraged_inverse", "SQQQ": "leveraged_inverse",
-    "SOXX": "plain_etf", "SMH": "plain_etf", "QQQ": "plain_etf", "SPY": "plain_etf",
+    "SOXX": "plain_etf", "SMH": "plain_etf", "QQQ": "plain_etf", "SPY": "plain_etf", "DIA": "plain_etf",
     "NVDA": "stock", "AMD": "stock", "TSM": "stock",
+    "AAPL": "stock", "MSFT": "stock", "GOOGL": "stock",
     "1570.T": "leveraged_bull",
     "1357.T": "leveraged_inverse",
     "1321.T": "plain_etf", "1306.T": "plain_etf",
     "7203.T": "stock", "6758.T": "stock", "7974.T": "stock", "8035.T": "stock", "9984.T": "stock",
     "8306.T": "stock", "9432.T": "stock", "6501.T": "stock", "8058.T": "stock", "9983.T": "stock",
     "6861.T": "stock", "4063.T": "stock", "7267.T": "stock", "6098.T": "stock", "4568.T": "stock",
+    "7269.T": "stock", "6752.T": "stock", "9433.T": "stock",
+    "8316.T": "stock", "8411.T": "stock",
+    "8031.T": "stock", "8001.T": "stock",
+    "3382.T": "stock", "8267.T": "stock",
+    "6273.T": "stock", "6954.T": "stock",
+    "4005.T": "stock", "4188.T": "stock",
+    "4324.T": "stock", "2168.T": "stock",
+    "4502.T": "stock", "4523.T": "stock",
+    "9766.T": "stock", "6460.T": "stock",
 }
+
+# 業種セクター分類（「今どの市場が熱いか」を横断的にウォッチするための分類。
+# TICKER_CATEGORY(商品タイプ)とは別軸）
+TICKER_SECTOR = {
+    "SOXL": "半導体", "SOXS": "半導体", "SOXX": "半導体", "SMH": "半導体",
+    "NVDA": "半導体", "AMD": "半導体", "TSM": "半導体", "8035.T": "半導体",
+    "TQQQ": "ハイテク(Nasdaq100)", "SQQQ": "ハイテク(Nasdaq100)", "QQQ": "ハイテク(Nasdaq100)",
+    "AAPL": "ハイテク(Nasdaq100)", "MSFT": "ハイテク(Nasdaq100)", "GOOGL": "ハイテク(Nasdaq100)",
+    "SPY": "米国株式市場全体", "SPXL": "米国株式市場全体", "DIA": "米国株式市場全体",
+    "1321.T": "日本株式市場全体", "1306.T": "日本株式市場全体",
+    "1570.T": "日本株式市場全体", "1357.T": "日本株式市場全体",
+    "7203.T": "自動車", "7267.T": "自動車", "7269.T": "自動車",
+    "6758.T": "エレクトロニクス", "6501.T": "エレクトロニクス", "6752.T": "エレクトロニクス",
+    "7974.T": "ゲーム・エンタメ", "9766.T": "ゲーム・エンタメ", "6460.T": "ゲーム・エンタメ",
+    "9432.T": "通信", "9984.T": "通信", "9433.T": "通信",
+    "8306.T": "金融", "8316.T": "金融", "8411.T": "金融",
+    "8058.T": "商社", "8031.T": "商社", "8001.T": "商社",
+    "9983.T": "小売", "3382.T": "小売", "8267.T": "小売",
+    "6861.T": "精密機器・FA", "6273.T": "精密機器・FA", "6954.T": "精密機器・FA",
+    "4063.T": "化学", "4005.T": "化学", "4188.T": "化学",
+    "6098.T": "サービス・人材", "4324.T": "サービス・人材", "2168.T": "サービス・人材",
+    "4568.T": "製薬", "4502.T": "製薬", "4523.T": "製薬",
+}
+
+# --- セクター別モメンタム ---
+MOMENTUM_SHORT_DAYS = 5    # 短期モメンタム（営業日）
+MOMENTUM_LONG_DAYS = 20    # 長期モメンタム（営業日）
+MOMENTUM_FILE = "ma_cross_momentum.csv"
 
 SHORT_WINDOW = 10
 LONG_WINDOW = 20
@@ -413,6 +466,28 @@ def get_approaching_crosses(ticker: str, df: pd.DataFrame):
     }]
 
 
+def compute_momentum(ticker: str, df: pd.DataFrame) -> dict:
+    """「今どの市場（セクター）が熱いか」を横断比較するための、直近リターン。
+    セクター単位の平均は generate_report.py 側で groupby 集計する。
+    """
+    close = df["Close"]
+    record = {
+        "ティッカー": ticker,
+        "カテゴリ": TICKER_CATEGORY.get(ticker, "unknown"),
+        "セクター": TICKER_SECTOR.get(ticker, "その他"),
+        "終値": round(float(close.iloc[-1]), 2),
+        f"リターン{MOMENTUM_SHORT_DAYS}営業日(%)": None,
+        f"リターン{MOMENTUM_LONG_DAYS}営業日(%)": None,
+    }
+    if len(close) > MOMENTUM_SHORT_DAYS:
+        ret = (close.iloc[-1] / close.iloc[-1 - MOMENTUM_SHORT_DAYS] - 1) * 100
+        record[f"リターン{MOMENTUM_SHORT_DAYS}営業日(%)"] = round(float(ret), 2)
+    if len(close) > MOMENTUM_LONG_DAYS:
+        ret = (close.iloc[-1] / close.iloc[-1 - MOMENTUM_LONG_DAYS] - 1) * 100
+        record[f"リターン{MOMENTUM_LONG_DAYS}営業日(%)"] = round(float(ret), 2)
+    return record
+
+
 # ------------------------------------------------------------
 # バックテスト
 # ------------------------------------------------------------
@@ -609,6 +684,7 @@ def main():
     all_signals = []
     all_backtest_records = []
     all_approaching = []
+    all_momentum = []
     chart_records = []
     track_record = load_track_record()
 
@@ -628,6 +704,7 @@ def main():
             all_signals.extend(signals)
             all_backtest_records.extend(backtest_ticker(ticker, df))
             all_approaching.extend(get_approaching_crosses(ticker, df))
+            all_momentum.append(compute_momentum(ticker, df))
             track_record = update_track_record(track_record, ticker, df)
 
             if signals:
@@ -663,6 +740,26 @@ def main():
             print(f"[接近中] {r['ティッカー']}({r['カテゴリ']}) - {r['接近中のシグナル']}方向 "
                   f"(乖離率{r['乖離率(%)']}%, 終値{r['終値']})")
         app_df.to_csv("ma_cross_approaching.csv", index=False, encoding="utf-8-sig")
+
+    if all_momentum:
+        mom_df = pd.DataFrame(all_momentum)
+        mom_df.to_csv(MOMENTUM_FILE, index=False, encoding="utf-8-sig")
+        short_col = f"リターン{MOMENTUM_SHORT_DAYS}営業日(%)"
+        # leveraged_inverse は同一セクター内の他銘柄と逆方向に動く設計のため、
+        # セクター平均に混ぜると打ち消し合って誤った「熱さ」になる → 除外する
+        sector_rank = (
+            mom_df[mom_df["カテゴリ"] != "leveraged_inverse"]
+            .dropna(subset=[short_col])
+            .groupby("セクター")[short_col]
+            .mean()
+            .sort_values(ascending=False)
+        )
+        if not sector_rank.empty:
+            print(f"\n{'=' * 70}")
+            print(f"セクター別モメンタム（直近{MOMENTUM_SHORT_DAYS}営業日リターン平均、上位から）")
+            print(f"{'=' * 70}")
+            for sector, ret in sector_rank.items():
+                print(f"  {sector}: {ret:+.2f}%")
 
     if chart_records:
         pd.concat(chart_records, ignore_index=True).to_csv(

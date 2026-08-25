@@ -22,6 +22,7 @@ SIGNALS_CSV = "ma_cross_signals.csv"
 BACKTEST_CSV = "ma_cross_backtest.csv"
 APPROACHING_CSV = "ma_cross_approaching.csv"
 CHART_DATA_CSV = "ma_cross_chart_data.csv"
+MOMENTUM_CSV = "ma_cross_momentum.csv"
 TRACK_RECORD_FILE = "signal_track_record.json"
 OUT_DIR = "_site"
 OUT_FILE = os.path.join(OUT_DIR, "index.html")
@@ -257,6 +258,63 @@ def render_approaching(df: pd.DataFrame | None) -> str:
 """
 
 
+def render_sector_momentum(df: pd.DataFrame | None) -> str:
+    if df is None or df.empty:
+        return '<p class="empty">モメンタムデータがありません。</p>'
+
+    short_col = [c for c in df.columns if c.startswith("リターン") and "5" in c]
+    long_col = [c for c in df.columns if c.startswith("リターン") and "20" in c]
+    if not short_col:
+        return '<p class="empty">モメンタムデータがありません。</p>'
+    short_col, long_col = short_col[0], (long_col[0] if long_col else None)
+
+    # leveraged_inverse は同一セクター内の他銘柄と逆方向に動く設計のため、
+    # セクター平均に混ぜると打ち消し合って誤った「熱さ」になる → 除外する
+    ranked = df[df["カテゴリ"] != "leveraged_inverse"].dropna(subset=[short_col])
+    if ranked.empty:
+        return '<p class="empty">モメンタムデータがありません。</p>'
+
+    agg = {short_col: "mean"}
+    if long_col:
+        agg[long_col] = "mean"
+    sector_g = ranked.groupby("セクター").agg(agg)
+    sector_g["n"] = ranked.groupby("セクター")["ティッカー"].count()
+    sector_g = sector_g.sort_values(short_col, ascending=False)
+
+    max_abs = max(sector_g[short_col].abs().max(), 0.01)
+
+    rows = []
+    for sector, row in sector_g.iterrows():
+        tickers = ", ".join(sorted(ranked[ranked["セクター"] == sector]["ティッカー"]))
+        bar_pct = min(100, abs(row[short_col]) / max_abs * 100)
+        bar_cls = "bar-pos" if row[short_col] >= 0 else "bar-neg"
+        long_cell = f'{row[long_col]:+.2f}%' if long_col else "-"
+        rows.append(f"""
+<tr>
+  <td>
+    <div class="ticker">{sector}</div>
+    <div class="sector-tickers">{tickers}</div>
+  </td>
+  <td class="num">{row[short_col]:+.2f}%</td>
+  <td class="num">{long_cell}</td>
+  <td class="num">{int(row['n'])}</td>
+  <td class="bar-cell"><div class="bar {bar_cls}" style="width:{bar_pct:.0f}%"></div></td>
+</tr>
+""")
+
+    return f"""
+<table>
+  <thead>
+    <tr><th>セクター</th><th>{short_col}</th><th>{long_col or ''}</th><th>銘柄数</th><th></th></tr>
+  </thead>
+  <tbody>
+    {''.join(rows)}
+  </tbody>
+</table>
+<p class="meta" style="margin-top:8px">直近{short_col.replace('リターン','').replace('(%)','')}リターン平均の高い順。レバレッジ・インバース型は平均計算から除外（同一セクター内で逆方向に動くため）。</p>
+"""
+
+
 def load_track_record() -> list:
     if not os.path.exists(TRACK_RECORD_FILE):
         return []
@@ -326,6 +384,7 @@ def main():
     backtest_df = load_csv(BACKTEST_CSV)
     approaching_df = load_csv(APPROACHING_CSV)
     chart_df = load_csv(CHART_DATA_CSV)
+    momentum_df = load_csv(MOMENTUM_CSV)
     track_records = load_track_record()
 
     updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -378,8 +437,13 @@ def main():
   }}
   th {{ color: var(--text-dim); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }}
   tr:last-child td {{ border-bottom: none; }}
-  td.ticker {{ font-weight: 700; }}
+  .ticker {{ font-weight: 700; }}
   td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+  .sector-tickers {{ color: var(--text-dim); font-size: 0.72rem; font-weight: 400; white-space: normal; margin-top: 2px; }}
+  .bar-cell {{ width: 140px; }}
+  .bar {{ height: 8px; border-radius: 4px; }}
+  .bar-pos {{ background: var(--accent); }}
+  .bar-neg {{ background: var(--accent-red); }}
   td.action {{ white-space: normal; min-width: 260px; color: var(--text-dim); font-size: 0.85rem; line-height: 1.5; }}
   th:nth-child(3), td:nth-child(3) {{ text-align: right; }}
   th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) {{ text-align: right; }}
@@ -446,6 +510,9 @@ def main():
 <div class="wrap">
   <h1>📊 MAクロス・スクリーナー</h1>
   <div class="updated">最終更新: {updated_at}（毎日8:00 JST頃に自動更新）</div>
+
+  <h2>🔥 セクター別モメンタム（今どの市場が熱いか）</h2>
+  <div class="scroll">{render_sector_momentum(momentum_df)}</div>
 
   <h2>直近5営業日のシグナル</h2>
   <div class="scroll">{render_signals_table(signals_df)}</div>
