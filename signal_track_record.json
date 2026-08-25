@@ -8,5 +8,15 @@
     "resolved": false,
     "exit_date": null,
     "return_pct": null
+  },
+  {
+    "ticker": "TSM",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-08-25",
+    "entry_price": 418.95,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null
   }
 ]
