@@ -12,6 +12,32 @@ import urllib.request
 
 SIGNALS_CSV = "ma_cross_signals.csv"
 
+CATEGORY_EMOJI = {
+    "leveraged_bull": "🚀",
+    "plain_etf": "📈",
+    "stock": "🏢",
+    "leveraged_inverse": "🔻",
+}
+
+
+def build_message(latest_date: str, rows: list) -> str:
+    lines = [f"## 🟢 ゴールデンクロス検出（{latest_date}）", ""]
+    for r in rows:
+        emoji = CATEGORY_EMOJI.get(r["カテゴリ"], "•")
+        lines.append(f"- {emoji} **{r['ティッカー']}** `${r['終値']}` — {r['カテゴリ']}")
+    lines.append("")
+    lines.append("_過去統計（2015年〜・21銘柄）ではフィルターなしで勝率55%程度。投資助言ではありません。_")
+    return "\n".join(lines)
+
+
+def build_click_url() -> str | None:
+    server = os.environ.get("GITHUB_SERVER_URL")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    if server and repo and run_id:
+        return f"{server}/{repo}/actions/runs/{run_id}"
+    return None
+
 
 def main():
     topic = os.environ.get("NTFY_TOPIC")
@@ -34,15 +60,25 @@ def main():
     latest_date = max(r["発生日"] for r in golden)
     latest = [r for r in golden if r["発生日"] == latest_date]
 
-    msg = f"ゴールデンクロス検出({latest_date}): " + ", ".join(
-        f"{r['ティッカー']} ${r['終値']}" for r in latest
-    )
+    msg = build_message(latest_date, latest)
     print(msg)
+
+    tickers_summary = ", ".join(r["ティッカー"] for r in latest)
+
+    headers = {
+        "Title": f"Golden Cross: {tickers_summary}"[:250],
+        "Tags": "rocket,chart_with_upwards_trend",
+        "Priority": "high",
+        "Markdown": "yes",
+    }
+    click_url = build_click_url()
+    if click_url:
+        headers["Click"] = click_url
 
     req = urllib.request.Request(
         f"https://ntfy.sh/{topic}",
         data=msg.encode("utf-8"),
-        headers={"Title": "MA Cross Screener", "Priority": "default"},
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
