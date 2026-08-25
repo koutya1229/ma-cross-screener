@@ -134,6 +134,37 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
     total_n = len(df)
     n_tickers = df["ticker"].nunique()
 
+    stop_rows = ""
+    if "return_pct_with_stop" in df.columns:
+        rows = []
+        for signal in ["ゴールデンクロス", "デッドクロス"]:
+            sub = df[df["signal"] == signal]
+            if sub.empty:
+                continue
+            stopped_rate = sub["stopped_out"].mean() * 100 if "stopped_out" in sub.columns else float("nan")
+            rows.append(
+                "<tr>"
+                f"<td>{signal_badge(signal)}</td>"
+                f'<td class="num">{sub["return_pct"].mean():+.2f}%</td>'
+                f'<td class="num">{sub["return_pct"].min():+.2f}%</td>'
+                f'<td class="num">{sub["return_pct_with_stop"].mean():+.2f}%</td>'
+                f'<td class="num">{sub["return_pct_with_stop"].min():+.2f}%</td>'
+                f'<td class="num">{stopped_rate:.1f}%</td>'
+                "</tr>"
+            )
+        stop_rows = f"""
+<h3 class="subhead">撤退目安を守った場合の効果</h3>
+<table>
+  <thead>
+    <tr><th>シグナル</th><th>平均(固定10日)</th><th>最悪(固定10日)</th><th>平均(撤退目安遵守)</th><th>最悪(撤退目安遵守)</th><th>撤退目安到達率</th></tr>
+  </thead>
+  <tbody>
+    {''.join(rows)}
+  </tbody>
+</table>
+<p class="meta" style="margin-top:8px">撤退目安（ATR%×2、終値ベース）に実際に到達した場合はそこで手仕舞いしたものとして計算。最悪ケースの下振れが大きく抑制される一方、平均・勝率はわずかに下がる（早期に損切りした分、後で回復した銘柄も含むため）。上のカード・カテゴリ別表は従来通り「10営業日固定保有」基準（フィルターの統計検証との継続性のため）。</p>
+"""
+
     cat_rows = []
     for signal in ["ゴールデンクロス", "デッドクロス"]:
         sub = df[df["signal"] == signal]
@@ -168,6 +199,7 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
     {''.join(cat_rows)}
   </tbody>
 </table>
+{stop_rows}
 """
 
 
@@ -417,6 +449,7 @@ def main():
   .wrap {{ max-width: 920px; margin: 0 auto; }}
   h1 {{ font-size: 1.5rem; margin: 0 0 4px; }}
   h2 {{ font-size: 1.1rem; margin: 32px 0 12px; color: var(--text); }}
+  .subhead {{ font-size: 0.95rem; margin: 24px 0 10px; color: var(--text); }}
   .updated {{ color: var(--text-dim); font-size: 0.85rem; margin-bottom: 24px; }}
   .meta {{ color: var(--text-dim); font-size: 0.85rem; }}
   .empty {{ color: var(--text-dim); font-style: italic; }}

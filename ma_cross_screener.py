@@ -13,6 +13,10 @@
     （analyze_new_conditions.py。54銘柄規模での再検証の結果、デッドクロスの
     EMA50<EMA200フィルターは leveraged_bull/plain_etf でのみ有効、個別株
     では無効と判明。カテゴリ限定に精緻化した）
+  + 撤退目安（ATR%×2）を実際に守った場合のバックテスト
+    （return_pct_with_stop。10営業日固定保有だけでは、撤退目安を無視して
+    大きく下振れした場合の損失がそのまま反映されてしまうため、実際の
+    推奨アクション通りに運用した場合の成績も別途計算する）
 
 必要ライブラリ:
     pip install yfinance pandas numpy
@@ -526,6 +530,33 @@ def compute_momentum(ticker: str, df: pd.DataFrame) -> dict:
 # バックテスト
 # ------------------------------------------------------------
 
+def simulate_stop_loss_exit(close: np.ndarray, idx: int, signal: str, entry_price: float, stop_pct):
+    """推奨アクションに記載している撤退目安（ATR%×2、終値ベース）を実際に
+    守っていた場合の手仕舞いを、エントリー後 BACKTEST_FORWARD_DAYS 営業日
+    以内でシミュレートする。撤退目安に到達しなければ、従来通り10営業日後
+    の終値で手仕舞いしたものとして扱う。
+
+    return: (exit_price, exit_days, stopped_out)
+    """
+    exit_idx = min(idx + BACKTEST_FORWARD_DAYS, len(close) - 1)
+
+    if stop_pct is None or (isinstance(stop_pct, float) and np.isnan(stop_pct)):
+        return close[exit_idx], exit_idx - idx, False
+
+    if signal == "ゴールデンクロス":
+        stop_price = entry_price * (1 - stop_pct / 100)
+        for i in range(idx + 1, exit_idx + 1):
+            if close[i] <= stop_price:
+                return close[i], i - idx, True
+    else:  # デッドクロス（空売り想定。逆方向に動いたら撤退）
+        stop_price = entry_price * (1 + stop_pct / 100)
+        for i in range(idx + 1, exit_idx + 1):
+            if close[i] >= stop_price:
+                return close[i], i - idx, True
+
+    return close[exit_idx], exit_idx - idx, False
+
+
 def backtest_ticker(ticker: str, df: pd.DataFrame):
     crosses = find_all_crosses(df)
     records = []
@@ -539,10 +570,22 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
         conditions = evaluate_conditions(row, signal, category)
 
         entry_price = close[idx]
+
+        # (A) 従来通り：撤退目安を無視して10営業日固定保有した場合
         exit_price = close[idx + BACKTEST_FORWARD_DAYS]
         ret_pct = (exit_price / entry_price - 1) * 100
         if signal == "デッドクロス":
             ret_pct = -ret_pct
+
+        # (B) 推奨アクション通り：撤退目安（ATR%×2）に到達したら手仕舞い
+        atr_pct = row.get("ATR_PCT")
+        stop_pct = round(atr_pct * 2, 1) if atr_pct is not None and not np.isnan(atr_pct) else None
+        exit_price_sl, exit_days_sl, stopped_out = simulate_stop_loss_exit(
+            close, idx, signal, entry_price, stop_pct
+        )
+        ret_pct_sl = (exit_price_sl / entry_price - 1) * 100
+        if signal == "デッドクロス":
+            ret_pct_sl = -ret_pct_sl
 
         records.append({
             "ticker": ticker,
@@ -551,6 +594,9 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
             "date": row.name.strftime("%Y-%m-%d"),
             "regime": label_market_regime(row.name),
             "return_pct": ret_pct,
+            "return_pct_with_stop": round(float(ret_pct_sl), 4),
+            "stopped_out": stopped_out,
+            "exit_days_with_stop": exit_days_sl,
             **conditions,
         })
 
@@ -582,6 +628,10 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
     """(1) 最新バーがアクション対象シグナル（ゴールデンクロス or 高信頼度
     デッドクロス）なら新規記録を追加し、(2) 既存の未確定記録のうち
     BACKTEST_FORWARD_DAYS 営業日が経過したものの結果を確定する。
+
+    結果確定は、エントリー時点の撤退目安（ATR%×2）に実際に到達していれば
+    その時点の終値で手仕舞いしたものとして計算する（simulate_stop_loss_exit）。
+    推奨アクション通りに運用した場合の実績を反映するための仕様。
     """
     last_idx = len(df) - 1
     crosses = find_all_crosses(df)
@@ -598,15 +648,19 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
                 r["ticker"] == ticker and r["entry_date"] == entry_date for r in records
             )
             if not already_logged:
+                atr_pct = row.get("ATR_PCT")
+                stop_pct = round(atr_pct * 2, 1) if atr_pct is not None and not np.isnan(atr_pct) else None
                 records.append({
                     "ticker": ticker,
                     "category": TICKER_CATEGORY.get(ticker, "unknown"),
                     "signal": signal,
                     "entry_date": entry_date,
                     "entry_price": round(float(row["Close"]), 4),
+                    "stop_pct": stop_pct,
                     "resolved": False,
                     "exit_date": None,
                     "return_pct": None,
+                    "stopped_out": None,
                 })
 
     date_index = {d.strftime("%Y-%m-%d"): i for i, d in enumerate(df.index)}
@@ -620,12 +674,17 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
         exit_idx = entry_idx + BACKTEST_FORWARD_DAYS
         if exit_idx >= len(df):
             continue
-        ret = (close[exit_idx] / r["entry_price"] - 1) * 100
+        # 推奨アクション通り、撤退目安（ATR%×2）に到達していればそこで手仕舞い
+        exit_price, exit_days, stopped_out = simulate_stop_loss_exit(
+            close, entry_idx, r["signal"], r["entry_price"], r.get("stop_pct")
+        )
+        ret = (exit_price / r["entry_price"] - 1) * 100
         if r["signal"] == "デッドクロス":
             ret = -ret
         r["resolved"] = True
-        r["exit_date"] = df.index[exit_idx].strftime("%Y-%m-%d")
+        r["exit_date"] = df.index[entry_idx + exit_days].strftime("%Y-%m-%d")
         r["return_pct"] = round(float(ret), 2)
+        r["stopped_out"] = stopped_out
 
     return records
 
@@ -653,6 +712,27 @@ def summarize_backtest(all_records: list):
         print(f"  平均={sub['return_pct'].mean():.2f}%  中央値={sub['return_pct'].median():.2f}%  "
               f"勝率={(sub['return_pct'] > 0).mean() * 100:.1f}%  標準偏差={sub['return_pct'].std():.2f}  "
               f"リスク調整後={risk_adj:.2f}")
+
+    # --- 撤退目安（ATR%×2）を守った場合の効果 ---
+    print(f"\n{'-' * 70}")
+    print("撤退目安を守った場合の効果（推奨アクション通りに運用した場合との比較）")
+    print(f"{'-' * 70}")
+    if "return_pct_with_stop" in bt_df.columns:
+        for signal in ["ゴールデンクロス", "デッドクロス"]:
+            sub = bt_df[bt_df["signal"] == signal]
+            if sub.empty:
+                continue
+            stopped_rate = sub["stopped_out"].mean() * 100 if "stopped_out" in sub.columns else float("nan")
+            worst_fixed = sub["return_pct"].min()
+            worst_stop = sub["return_pct_with_stop"].min()
+            print(f"\n■ {signal}  n={len(sub)}  （撤退目安到達率={stopped_rate:.1f}%）")
+            print(f"  10営業日固定保有 : 平均={sub['return_pct'].mean():.2f}%  "
+                  f"勝率={(sub['return_pct']>0).mean()*100:.1f}%  最悪={worst_fixed:.2f}%")
+            print(f"  撤退目安を遵守   : 平均={sub['return_pct_with_stop'].mean():.2f}%  "
+                  f"勝率={(sub['return_pct_with_stop']>0).mean()*100:.1f}%  最悪={worst_stop:.2f}%")
+        print("\n  ※ 判定・高信頼度フィルターの有意性検証は「10営業日固定保有」の数値を")
+        print("    基準にしている（過去の検証との継続性のため）。撤退目安の効果は")
+        print("    参考情報として、実際に運用した場合の下振れ抑制効果を示すもの。")
 
     # --- デッドクロスの絞り込み効果（high_confidence フラグの有無で比較） ---
     print(f"\n{'-' * 70}")
