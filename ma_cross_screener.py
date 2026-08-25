@@ -17,6 +17,8 @@
     （return_pct_with_stop。10営業日固定保有だけでは、撤退目安を無視して
     大きく下振れした場合の損失がそのまま反映されてしまうため、実際の
     推奨アクション通りに運用した場合の成績も別途計算する）
+  + 保有日数別のバックテスト（return_pct_{N}d_hold、N=5/10/20/40/60/90
+    営業日）。長期保有した場合にエッジが強まる/弱まるかを比較できる
 
 必要ライブラリ:
     pip install yfinance pandas numpy
@@ -165,6 +167,11 @@ TRACK_RECORD_MAX_KEEP = 200     # 肥大化防止のため保持する最大件�
 BACKTEST_START_DATE = "2015-01-01"
 
 BACKTEST_FORWARD_DAYS = 10
+
+# 「10営業日固定保有」以外の保有期間でも成績を比較できるようにする
+# （長期保有した場合にエッジが強まる/弱まるかを見るため）。
+BACKTEST_HORIZONS_DAYS = [5, 10, 20, 40, 60, 90]
+
 RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 30
 
@@ -587,7 +594,7 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
         if signal == "デッドクロス":
             ret_pct_sl = -ret_pct_sl
 
-        records.append({
+        record = {
             "ticker": ticker,
             "category": category,
             "signal": signal,
@@ -597,8 +604,23 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
             "return_pct_with_stop": round(float(ret_pct_sl), 4),
             "stopped_out": stopped_out,
             "exit_days_with_stop": exit_days_sl,
-            **conditions,
-        })
+        }
+
+        # (C) 参考: 撤退目安を考慮しない「単純な長期保有」を複数の保有日数で比較
+        # （エッジが長期でも続くか、短期だけのものかを見るための情報）
+        for h in BACKTEST_HORIZONS_DAYS:
+            col = f"return_pct_{h}d_hold"
+            if idx + h < len(df):
+                exit_h_price = close[idx + h]
+                ret_h = (exit_h_price / entry_price - 1) * 100
+                if signal == "デッドクロス":
+                    ret_h = -ret_h
+                record[col] = round(float(ret_h), 4)
+            else:
+                record[col] = None
+
+        record.update(conditions)
+        records.append(record)
 
     return records
 
@@ -712,6 +734,26 @@ def summarize_backtest(all_records: list):
         print(f"  平均={sub['return_pct'].mean():.2f}%  中央値={sub['return_pct'].median():.2f}%  "
               f"勝率={(sub['return_pct'] > 0).mean() * 100:.1f}%  標準偏差={sub['return_pct'].std():.2f}  "
               f"リスク調整後={risk_adj:.2f}")
+
+    # --- 保有日数別の成績（長期保有した場合にエッジが続くか） ---
+    print(f"\n{'-' * 70}")
+    print("保有日数別の成績（撤退目安を考慮しない単純な保有、参考情報）")
+    print(f"{'-' * 70}")
+    for signal in ["ゴールデンクロス", "デッドクロス"]:
+        sub = bt_df[bt_df["signal"] == signal]
+        if sub.empty:
+            continue
+        print(f"\n■ {signal}")
+        for h in BACKTEST_HORIZONS_DAYS:
+            col = f"return_pct_{h}d_hold"
+            if col not in sub.columns:
+                continue
+            valid = sub[col].dropna()
+            if valid.empty:
+                continue
+            win_rate = (valid > 0).mean() * 100
+            print(f"  {h:>3}営業日保有: n={len(valid):>5}  平均={valid.mean():+6.2f}%  "
+                  f"中央値={valid.median():+6.2f}%  勝率={win_rate:5.1f}%  標準偏差={valid.std():.2f}")
 
     # --- 撤退目安（ATR%×2）を守った場合の効果 ---
     print(f"\n{'-' * 70}")

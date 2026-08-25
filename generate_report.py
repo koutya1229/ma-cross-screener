@@ -165,6 +165,48 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
 <p class="meta" style="margin-top:8px">撤退目安（ATR%×2、終値ベース）に実際に到達した場合はそこで手仕舞いしたものとして計算。最悪ケースの下振れが大きく抑制される一方、平均・勝率はわずかに下がる（早期に損切りした分、後で回復した銘柄も含むため）。上のカード・カテゴリ別表は従来通り「10営業日固定保有」基準（フィルターの統計検証との継続性のため）。</p>
 """
 
+    horizon_cols = [c for c in df.columns if c.endswith("d_hold")]
+    horizon_rows = ""
+    if horizon_cols:
+        # 列名 return_pct_5d_hold → 5 のように日数でソート
+        horizon_cols = sorted(horizon_cols, key=lambda c: int(c.split("_")[2].rstrip("d")))
+        blocks = []
+        for signal in ["ゴールデンクロス", "デッドクロス"]:
+            sub = df[df["signal"] == signal]
+            if sub.empty:
+                continue
+            rows = []
+            for col in horizon_cols:
+                days = col.split("_")[2].rstrip("d")
+                valid = sub[col].dropna()
+                if valid.empty:
+                    continue
+                rows.append(
+                    "<tr>"
+                    f'<td class="ticker">{days}営業日</td>'
+                    f'<td class="num">{valid.mean():+.2f}%</td>'
+                    f'<td class="num">{valid.median():+.2f}%</td>'
+                    f'<td class="num">{(valid>0).mean()*100:.1f}%</td>'
+                    f'<td class="num">{valid.std():.2f}</td>'
+                    "</tr>"
+                )
+            blocks.append(f"""
+<div class="chart-card" style="padding:14px 16px;">
+  <div class="chart-title">{signal_badge(signal)}</div>
+  <table>
+    <thead><tr><th>保有日数</th><th>平均</th><th>中央値</th><th>勝率</th><th>標準偏差</th></tr></thead>
+    <tbody>{''.join(rows)}</tbody>
+  </table>
+</div>
+""")
+        horizon_rows = f"""
+<h3 class="subhead">保有日数別の成績（長期保有した場合にエッジが続くか）</h3>
+<div class="chart-grid">
+  {''.join(blocks)}
+</div>
+<p class="meta" style="margin-top:8px">撤退目安を考慮しない単純な保有（参考情報）。ゴールデンクロスは長期保有ほど勝率・平均リターンが上がる傾向、デッドクロス（空売り換算）は逆に長期ほど不利になる傾向がある（市場全体の長期的な上昇バイアスの影響）。</p>
+"""
+
     cat_rows = []
     for signal in ["ゴールデンクロス", "デッドクロス"]:
         sub = df[df["signal"] == signal]
@@ -199,6 +241,7 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
     {''.join(cat_rows)}
   </tbody>
 </table>
+{horizon_rows}
 {stop_rows}
 """
 
