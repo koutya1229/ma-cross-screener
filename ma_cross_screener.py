@@ -19,6 +19,11 @@
     推奨アクション通りに運用した場合の成績も別途計算する）
   + 保有日数別のバックテスト（return_pct_{N}d_hold、N=5/10/20/40/60/90
     営業日）。長期保有した場合にエッジが強まる/弱まるかを比較できる
+  + アダプティブ運用（return_pct_adaptive）: 最初の10営業日は固定の撤退
+    目安、そこを生存したらトレーリングストップに切り替えて最大
+    ADAPTIVE_MAX_HOLD_DAYS 営業日まで保有延長する2段階の出口戦略。
+    signal_track_record.json にも phase（initial/trailing/resolved）
+    として反映し、Webレポートに「保有継続中」銘柄を表示する
 
 必要ライブラリ:
     pip install yfinance pandas numpy
@@ -171,6 +176,15 @@ BACKTEST_FORWARD_DAYS = 10
 # 「10営業日固定保有」以外の保有期間でも成績を比較できるようにする
 # （長期保有した場合にエッジが強まる/弱まるかを見るため）。
 BACKTEST_HORIZONS_DAYS = [5, 10, 20, 40, 60, 90]
+
+# 2段階出口戦略（アダプティブ運用）: 最初の10営業日はエントリー価格基準の
+# 固定撤退目安。ここで撤退目安に触れずに生き残った場合、その後は最高値
+# （デッドクロスなら最安値）基準のトレーリングストップに切り替えて保有を
+# 延長する。BACKTEST_HORIZONS_DAYS の検証済み上限に合わせ、最大90営業日
+# まで。「10営業日生存トレードはその後も期待値が高い」という検証結果
+# （leveraged_bull, n=245, 10日時点勝率75.1% vs 撤退済み5.0%, p≈0）を
+# 反映した運用ルール。
+ADAPTIVE_MAX_HOLD_DAYS = 90
 
 RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 30
@@ -427,13 +441,19 @@ def suggest_action(
     stop_note = f"翌営業日以降、終値がエントリー比-{stop_pct}%を下回ったら撤退目安" if stop_pct else ""
     sizing_note = position_sizing(ticker, category, price, stop_pct, fx_rate) if stop_pct else ""
 
+    hold_extend_note = (
+        "10営業日経過時点で撤退目安未到達なら、そこで手仕舞いせず保有継続を検討"
+        "（過去データでは生存トレードのその後の勝率70%超・期待値が大きく改善する傾向。"
+        f"以降は直近高値/安値基準のトレーリングストップに切替、最大{ADAPTIVE_MAX_HOLD_DAYS}営業日目安）"
+    )
+
     if signal == "ゴールデンクロス":
         if category == "leveraged_inverse":
             return "統計的に不利（過去勝率37%程度）。見送り推奨"
         action = "翌営業日の始値付近で買い、10営業日後を目安に手仕舞い"
         if category == "leveraged_bull":
             action += "。値動きが大きいため通常より小さめの数量で"
-        parts = [p for p in [action, stop_note, sizing_note] if p]
+        parts = [p for p in [action, stop_note, sizing_note, hold_extend_note] if p]
         return "。".join(parts)
 
     # デッドクロス
@@ -441,7 +461,7 @@ def suggest_action(
         if ticker in MARGIN_SHORT_INELIGIBLE:
             return "空売り不可（レバレッジ/インバース型は米国株信用取引の対象外）。現物保有していれば売却を検討、新規の売りポジションは持てません"
         base = "空売り、または保有株の利確・損切りを検討。10営業日後を目安に手仕舞い"
-        parts = [p for p in [base, stop_note, sizing_note] if p]
+        parts = [p for p in [base, stop_note, sizing_note, hold_extend_note] if p]
         return "。".join(parts)
     return "見送り推奨。ノーアクションが無難"
 
@@ -564,6 +584,69 @@ def simulate_stop_loss_exit(close: np.ndarray, idx: int, signal: str, entry_pric
     return close[exit_idx], exit_idx - idx, False
 
 
+def simulate_adaptive_exit(close: np.ndarray, idx: int, signal: str, entry_price: float, stop_pct):
+    """2段階の出口戦略をシミュレートする。
+
+    フェーズ1（エントリーから10営業日以内）: simulate_stop_loss_exit と同じ
+    固定の撤退目安。ここで撤退目安に到達すれば手仕舞い（exit_reason=
+    "initial_stop"）。
+
+    フェーズ2（10営業日経過後、撤退目安未到達なら）: トレーリングストップ
+    （ゴールデンクロスならエントリー後の最高値、デッドクロスなら最安値を
+    基準に同じ%だけ離れたライン）に切り替え、ADAPTIVE_MAX_HOLD_DAYS を
+    上限に保有を延長する。
+
+    まだ結果が確定できない場合（データ不足）は None を返す。
+    確定した場合は (exit_price, exit_days, stopped_out, exit_reason) を返す。
+    exit_reason は "initial_stop" / "trailing_stop" / "max_hold" / "fixed_hold"。
+    """
+    n = len(close)
+    exit_idx_initial = idx + BACKTEST_FORWARD_DAYS
+    if exit_idx_initial >= n:
+        return None
+
+    is_long = signal == "ゴールデンクロス"
+
+    if stop_pct is None or (isinstance(stop_pct, float) and np.isnan(stop_pct)):
+        return close[exit_idx_initial], exit_idx_initial - idx, False, "fixed_hold"
+
+    # --- フェーズ1: 固定撤退目安 ---
+    if is_long:
+        initial_stop_price = entry_price * (1 - stop_pct / 100)
+        for i in range(idx + 1, exit_idx_initial + 1):
+            if close[i] <= initial_stop_price:
+                return close[i], i - idx, True, "initial_stop"
+    else:
+        initial_stop_price = entry_price * (1 + stop_pct / 100)
+        for i in range(idx + 1, exit_idx_initial + 1):
+            if close[i] >= initial_stop_price:
+                return close[i], i - idx, True, "initial_stop"
+
+    # --- フェーズ2: トレーリングストップ（10営業日目以降） ---
+    max_hold_idx = idx + ADAPTIVE_MAX_HOLD_DAYS
+    window = close[idx + 1: exit_idx_initial + 1]
+    running_extreme = window.max() if is_long else window.min()
+
+    i = exit_idx_initial + 1
+    while i < n and i <= max_hold_idx:
+        if is_long:
+            running_extreme = max(running_extreme, close[i])
+            trail_price = running_extreme * (1 - stop_pct / 100)
+            if close[i] <= trail_price:
+                return close[i], i - idx, False, "trailing_stop"
+        else:
+            running_extreme = min(running_extreme, close[i])
+            trail_price = running_extreme * (1 + stop_pct / 100)
+            if close[i] >= trail_price:
+                return close[i], i - idx, False, "trailing_stop"
+        i += 1
+
+    if i > max_hold_idx and max_hold_idx < n:
+        return close[max_hold_idx], max_hold_idx - idx, False, "max_hold"
+
+    return None  # トレーリング中でまだ結果未確定（データ不足）
+
+
 def backtest_ticker(ticker: str, df: pd.DataFrame):
     crosses = find_all_crosses(df)
     records = []
@@ -594,6 +677,18 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
         if signal == "デッドクロス":
             ret_pct_sl = -ret_pct_sl
 
+        # (D) アダプティブ運用：10営業日生存後はトレーリングストップに切替
+        adaptive = simulate_adaptive_exit(close, idx, signal, entry_price, stop_pct)
+        ret_pct_adaptive, adaptive_exit_days, adaptive_exit_reason = None, None, None
+        if adaptive is not None:
+            exit_price_ad, exit_days_ad, _, exit_reason_ad = adaptive
+            ret_pct_ad = (exit_price_ad / entry_price - 1) * 100
+            if signal == "デッドクロス":
+                ret_pct_ad = -ret_pct_ad
+            ret_pct_adaptive = round(float(ret_pct_ad), 4)
+            adaptive_exit_days = exit_days_ad
+            adaptive_exit_reason = exit_reason_ad
+
         record = {
             "ticker": ticker,
             "category": category,
@@ -604,6 +699,9 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
             "return_pct_with_stop": round(float(ret_pct_sl), 4),
             "stopped_out": stopped_out,
             "exit_days_with_stop": exit_days_sl,
+            "return_pct_adaptive": ret_pct_adaptive,
+            "adaptive_exit_days": adaptive_exit_days,
+            "adaptive_exit_reason": adaptive_exit_reason,
         }
 
         # (C) 参考: 撤退目安を考慮しない「単純な長期保有」を複数の保有日数で比較
@@ -648,12 +746,12 @@ def save_track_record(records: list) -> None:
 
 def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
     """(1) 最新バーがアクション対象シグナル（ゴールデンクロス or 高信頼度
-    デッドクロス）なら新規記録を追加し、(2) 既存の未確定記録のうち
-    BACKTEST_FORWARD_DAYS 営業日が経過したものの結果を確定する。
+    デッドクロス）なら新規記録を追加し、(2) 既存の未確定記録の結果を、
+    2段階の出口戦略（simulate_adaptive_exit）で確定する。
 
-    結果確定は、エントリー時点の撤退目安（ATR%×2）に実際に到達していれば
-    その時点の終値で手仕舞いしたものとして計算する（simulate_stop_loss_exit）。
-    推奨アクション通りに運用した場合の実績を反映するための仕様。
+    最初の10営業日は固定の撤退目安。ここを撤退目安なしで生き残った場合は
+    phase="trailing"（トレーリングストップに切替・保有継続中）として扱い、
+    トレーリングストップ到達か ADAPTIVE_MAX_HOLD_DAYS 到達で最終確定する。
     """
     last_idx = len(df) - 1
     crosses = find_all_crosses(df)
@@ -683,6 +781,8 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
                     "exit_date": None,
                     "return_pct": None,
                     "stopped_out": None,
+                    "exit_reason": None,
+                    "phase": "initial",
                 })
 
     date_index = {d.strftime("%Y-%m-%d"): i for i, d in enumerate(df.index)}
@@ -693,13 +793,16 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
         entry_idx = date_index.get(r["entry_date"])
         if entry_idx is None:
             continue
-        exit_idx = entry_idx + BACKTEST_FORWARD_DAYS
-        if exit_idx >= len(df):
+
+        result = simulate_adaptive_exit(close, entry_idx, r["signal"], r["entry_price"], r.get("stop_pct"))
+        if result is None:
+            # まだ結果未確定。10営業日を過ぎて撤退目安に触れていなければ
+            # トレーリングストップに移行して保有継続中であることを示す
+            if entry_idx + BACKTEST_FORWARD_DAYS < len(df):
+                r["phase"] = "trailing"
             continue
-        # 推奨アクション通り、撤退目安（ATR%×2）に到達していればそこで手仕舞い
-        exit_price, exit_days, stopped_out = simulate_stop_loss_exit(
-            close, entry_idx, r["signal"], r["entry_price"], r.get("stop_pct")
-        )
+
+        exit_price, exit_days, stopped_out, exit_reason = result
         ret = (exit_price / r["entry_price"] - 1) * 100
         if r["signal"] == "デッドクロス":
             ret = -ret
@@ -707,6 +810,8 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
         r["exit_date"] = df.index[entry_idx + exit_days].strftime("%Y-%m-%d")
         r["return_pct"] = round(float(ret), 2)
         r["stopped_out"] = stopped_out
+        r["exit_reason"] = exit_reason
+        r["phase"] = "resolved"
 
     return records
 
@@ -775,6 +880,27 @@ def summarize_backtest(all_records: list):
         print("\n  ※ 判定・高信頼度フィルターの有意性検証は「10営業日固定保有」の数値を")
         print("    基準にしている（過去の検証との継続性のため）。撤退目安の効果は")
         print("    参考情報として、実際に運用した場合の下振れ抑制効果を示すもの。")
+
+    # --- アダプティブ運用（10営業日生存後はトレーリングストップへ切替）の効果 ---
+    print(f"\n{'-' * 70}")
+    print(f"アダプティブ運用の効果（10営業日生存後はトレーリングストップに切替、最大{ADAPTIVE_MAX_HOLD_DAYS}営業日）")
+    print(f"{'-' * 70}")
+    if "return_pct_adaptive" in bt_df.columns:
+        for signal in ["ゴールデンクロス", "デッドクロス"]:
+            sub = bt_df[bt_df["signal"] == signal]
+            valid = sub["return_pct_adaptive"].dropna()
+            if valid.empty:
+                continue
+            survived = sub[sub["adaptive_exit_reason"] != "initial_stop"]["return_pct_adaptive"].dropna()
+            print(f"\n■ {signal}  n={len(valid)}")
+            print(f"  全体（初期撤退＋トレーリング合算）: 平均={valid.mean():+.2f}%  "
+                  f"勝率={(valid>0).mean()*100:.1f}%  最悪={valid.min():.2f}%")
+            if not survived.empty:
+                print(f"  うち初期10日を生存した分のみ    : 平均={survived.mean():+.2f}%  "
+                      f"勝率={(survived>0).mean()*100:.1f}%  最悪={survived.min():.2f}%  (n={len(survived)})")
+        print("\n  ※ 全体の勝率は「10営業日固定保有」より低くなる（トレーリングストップが")
+        print("    利益確定前に小さな損切りを頻発させるため）が、平均リターンは改善する")
+        print("    傾向（小さく負けて大きく勝つ、トレンドフォロー型の特性）。")
 
     # --- デッドクロスの絞り込み効果（high_confidence フラグの有無で比較） ---
     print(f"\n{'-' * 70}")

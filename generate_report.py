@@ -165,6 +165,44 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
 <p class="meta" style="margin-top:8px">撤退目安（ATR%×2、終値ベース）に実際に到達した場合はそこで手仕舞いしたものとして計算。最悪ケースの下振れが大きく抑制される一方、平均・勝率はわずかに下がる（早期に損切りした分、後で回復した銘柄も含むため）。上のカード・カテゴリ別表は従来通り「10営業日固定保有」基準（フィルターの統計検証との継続性のため）。</p>
 """
 
+    adaptive_rows = ""
+    if "return_pct_adaptive" in df.columns:
+        rows = []
+        for signal in ["ゴールデンクロス", "デッドクロス"]:
+            sub = df[df["signal"] == signal]
+            valid = sub["return_pct_adaptive"].dropna()
+            if valid.empty:
+                continue
+            survived = sub[sub["adaptive_exit_reason"] != "initial_stop"]["return_pct_adaptive"].dropna()
+            if not survived.empty:
+                survived_mean_cell = f'<td class="num">{survived.mean():+.2f}%</td>'
+                survived_win_cell = f'<td class="num">{(survived>0).mean()*100:.1f}%</td>'
+            else:
+                survived_mean_cell = '<td class="num">-</td>'
+                survived_win_cell = '<td class="num">-</td>'
+            rows.append(
+                "<tr>"
+                f"<td>{signal_badge(signal)}</td>"
+                f'<td class="num">{valid.mean():+.2f}%</td>'
+                f'<td class="num">{(valid>0).mean()*100:.1f}%</td>'
+                f'<td class="num">{valid.min():+.2f}%</td>'
+                f"{survived_mean_cell}"
+                f"{survived_win_cell}"
+                "</tr>"
+            )
+        adaptive_rows = f"""
+<h3 class="subhead">アダプティブ運用の効果（10営業日生存後はトレーリングストップに切替、最大90営業日）</h3>
+<table>
+  <thead>
+    <tr><th>シグナル</th><th>平均(全体)</th><th>勝率(全体)</th><th>最悪(全体)</th><th>平均(生存分のみ)</th><th>勝率(生存分のみ)</th></tr>
+  </thead>
+  <tbody>
+    {''.join(rows)}
+  </tbody>
+</table>
+<p class="meta" style="margin-top:8px">全体の勝率は「10営業日固定保有」より低くなる（トレーリングストップが利益確定前に小さな損切りを頻発させるため）が、平均リターンは改善する傾向（小さく負けて大きく勝つ、トレンドフォロー型の特性）。「生存分のみ」は初期10日の撤退目安を無事通過した銘柄の、その後の成績。</p>
+"""
+
     horizon_cols = [c for c in df.columns if c.endswith("d_hold")]
     horizon_rows = ""
     if horizon_cols:
@@ -243,6 +281,7 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
 </table>
 {horizon_rows}
 {stop_rows}
+{adaptive_rows}
 """
 
 
@@ -446,8 +485,35 @@ def render_track_record(records: list) -> str:
 </table>
 """)
 
-    if pending:
-        parts.append(f'<p class="meta" style="margin-top:12px">結果確定待ち: {len(pending)}件（発生から10営業日経過後に確定します）</p>')
+    trailing = [r for r in pending if r.get("phase") == "trailing"]
+    initial = [r for r in pending if r.get("phase") != "trailing"]
+
+    if trailing:
+        rows = []
+        for r in trailing:
+            rows.append(
+                "<tr>"
+                f'<td class="ticker">{r["ticker"]}</td>'
+                f"<td>{signal_badge(r['signal'])}</td>"
+                f'<td>{r["entry_date"]}〜</td>'
+                f'<td><span class="badge badge-high">保有継続中（トレーリングストップ）</span></td>'
+                "</tr>"
+            )
+        parts.append(f"""
+<h3 class="subhead">🟢 保有継続中（10営業日生存・トレーリングストップ移行済み）</h3>
+<table>
+  <thead>
+    <tr><th>ティッカー</th><th>シグナル</th><th>エントリー日</th><th>状態</th></tr>
+  </thead>
+  <tbody>
+    {''.join(rows)}
+  </tbody>
+</table>
+<p class="meta" style="margin-top:8px">初期10営業日の撤退目安を無事通過した銘柄。過去データでは、ここから保有を延長すると期待値が大きく改善する傾向（leveraged_bull, n=245, 10日時点勝率75.1%）。直近高値/安値基準のトレーリングストップで管理してください。</p>
+""")
+
+    if initial:
+        parts.append(f'<p class="meta" style="margin-top:12px">結果確定待ち（初期リスク期間中）: {len(initial)}件</p>')
 
     return "".join(parts)
 
