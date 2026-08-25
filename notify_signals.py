@@ -1,6 +1,7 @@
 """
-ma_cross_screener.py の実行後、直近営業日に新しく発生したゴールデンクロス
-（買いシグナル）があれば ntfy.sh 経由でプッシュ通知する。
+ma_cross_screener.py の実行後、直近営業日に新しく発生した「アクション対象
+シグナル」（ゴールデンクロス、または高信頼度デッドクロス）があれば ntfy.sh
+経由でプッシュ通知する。低信頼度デッドクロス（見送り推奨）は通知しない。
 
 GitHub Actions から呼ばれる想定（環境変数 NTFY_TOPIC が必須）。
 """
@@ -20,13 +21,36 @@ CATEGORY_EMOJI = {
 }
 
 
+def is_actionable(row: dict) -> bool:
+    if row.get("シグナル") == "ゴールデンクロス":
+        return True
+    return row.get("判定") == "高信頼度"
+
+
 def build_message(latest_date: str, rows: list) -> str:
-    lines = [f"## 🟢 ゴールデンクロス検出（{latest_date}）", ""]
-    for r in rows:
-        emoji = CATEGORY_EMOJI.get(r["カテゴリ"], "•")
-        lines.append(f"- {emoji} **{r['ティッカー']}** `${r['終値']}` — {r['カテゴリ']}")
-    lines.append("")
-    lines.append("_過去統計（2015年〜・21銘柄）ではフィルターなしで勝率55%程度。投資助言ではありません。_")
+    golden = [r for r in rows if r["シグナル"] == "ゴールデンクロス"]
+    dead = [r for r in rows if r["シグナル"] == "デッドクロス"]
+
+    lines = [f"## シグナル検出（{latest_date}）", ""]
+
+    if golden:
+        lines.append("### 🟢 ゴールデンクロス（買い）")
+        for r in golden:
+            emoji = CATEGORY_EMOJI.get(r["カテゴリ"], "•")
+            lines.append(f"- {emoji} **{r['ティッカー']}** `${r['終値']}` — {r['カテゴリ']}")
+        lines.append("")
+
+    if dead:
+        lines.append("### 🔴 デッドクロス・高信頼度（売り/空売り検討）")
+        for r in dead:
+            emoji = CATEGORY_EMOJI.get(r["カテゴリ"], "•")
+            lines.append(f"- {emoji} **{r['ティッカー']}** `${r['終値']}` — {r['カテゴリ']}")
+        lines.append("")
+
+    lines.append(
+        "_過去統計ではゴールデンクロス勝率55%程度、高信頼度デッドクロス勝率56〜58%程度。"
+        "投資助言ではありません。_"
+    )
     return "\n".join(lines)
 
 
@@ -62,10 +86,19 @@ def send_summary(topic: str, latest_date: str, rows: list) -> None:
     msg = build_message(latest_date, rows)
     print(msg)
 
+    has_golden = any(r["シグナル"] == "ゴールデンクロス" for r in rows)
+    has_dead = any(r["シグナル"] == "デッドクロス" for r in rows)
+    tags = []
+    if has_golden:
+        tags.append("rocket")
+    if has_dead:
+        tags.append("warning")
+    tags.append("chart_with_upwards_trend" if has_golden else "chart_with_downwards_trend")
+
     tickers_summary = ", ".join(r["ティッカー"] for r in rows)
     headers = {
-        "Title": f"Golden Cross: {tickers_summary}"[:250],
-        "Tags": "rocket,chart_with_upwards_trend",
+        "Title": f"Signals: {tickers_summary}"[:250],
+        "Tags": ",".join(tags),
         "Priority": "high",
         "Markdown": "yes",
     }
@@ -108,13 +141,13 @@ def main():
         print("本日はシグナルなし（ma_cross_signals.csv が生成されませんでした）")
         return
 
-    golden = [r for r in rows if r.get("シグナル") == "ゴールデンクロス"]
-    if not golden:
-        print("本日は新しいゴールデンクロスなし")
+    actionable = [r for r in rows if is_actionable(r)]
+    if not actionable:
+        print("本日は新しいアクション対象シグナルなし（ゴールデンクロス／高信頼度デッドクロスとも0件）")
         return
 
-    latest_date = max(r["発生日"] for r in golden)
-    latest = [r for r in golden if r["発生日"] == latest_date]
+    latest_date = max(r["発生日"] for r in actionable)
+    latest = [r for r in actionable if r["発生日"] == latest_date]
 
     send_summary(topic, latest_date, latest)
     send_attachment(topic, SIGNALS_CSV, latest_date)

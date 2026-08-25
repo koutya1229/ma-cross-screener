@@ -7,7 +7,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install yfinance pandas numpy
+        run: pip install yfinance pandas numpy matplotlib
 
       - name: Run screener
         run: python ma_cross_screener.py
@@ -38,10 +38,23 @@ jobs:
         with:
           path: _site
 
-      - name: Notify on golden cross
+      - name: Notify on signal (golden cross / high-confidence dead cross)
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python notify_golden_cross.py
+        run: python notify_signals.py
+
+      - name: Weekly digest (Mondays only)
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python weekly_digest.py
+
+      - name: Commit signal track record
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add signal_track_record.json
+          git diff --staged --quiet || git commit -m "Update signal track record"
+          git push
 
   deploy:
     needs: check

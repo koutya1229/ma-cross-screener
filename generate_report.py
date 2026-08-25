@@ -6,15 +6,34 @@ ma_cross_screener.py が出力した CSV から、閲覧しやすい静的HTML�
 出力: _site/index.html
 """
 
+import base64
+import json
 import os
 from datetime import datetime, timezone
+from io import BytesIO
 
 import pandas as pd
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 SIGNALS_CSV = "ma_cross_signals.csv"
 BACKTEST_CSV = "ma_cross_backtest.csv"
+APPROACHING_CSV = "ma_cross_approaching.csv"
+CHART_DATA_CSV = "ma_cross_chart_data.csv"
+TRACK_RECORD_FILE = "signal_track_record.json"
 OUT_DIR = "_site"
 OUT_FILE = os.path.join(OUT_DIR, "index.html")
+
+CHART_COLORS = {
+    "close": "#9aa1b1",
+    "ema10": "#34d399",
+    "ema20": "#f87171",
+    "cross": "#fbbf24",
+    "grid": "#262b36",
+    "text": "#9aa1b1",
+}
 
 CATEGORY_LABEL = {
     "leveraged_bull": "レバレッジ(ブル)",
@@ -151,11 +170,163 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
 """
 
 
+def render_chart(ticker_df: pd.DataFrame, cross_date: str) -> str:
+    """1銘柄分のEMAチャートをPNG(base64)として描画する。"""
+    fig, ax = plt.subplots(figsize=(6, 2.3), dpi=140)
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+
+    ax.plot(ticker_df["Date"], ticker_df["Close"], color=CHART_COLORS["close"], linewidth=1, label="Close")
+    ax.plot(ticker_df["Date"], ticker_df["EMA10"], color=CHART_COLORS["ema10"], linewidth=1.4, label="EMA10")
+    ax.plot(ticker_df["Date"], ticker_df["EMA20"], color=CHART_COLORS["ema20"], linewidth=1.4, label="EMA20")
+
+    match = ticker_df[ticker_df["Date"] == cross_date]
+    if not match.empty:
+        ax.scatter(match["Date"], match["Close"], color=CHART_COLORS["cross"], s=45, zorder=5, label="Cross")
+
+    n_ticks = min(6, len(ticker_df))
+    tick_idx = list(range(0, len(ticker_df), max(1, len(ticker_df) // n_ticks)))
+    ax.set_xticks([ticker_df["Date"].iloc[i] for i in tick_idx])
+    ax.tick_params(colors=CHART_COLORS["text"], labelsize=6.5)
+    ax.tick_params(axis="x", rotation=30)
+    for spine in ax.spines.values():
+        spine.set_color(CHART_COLORS["grid"])
+    ax.grid(axis="y", color=CHART_COLORS["grid"], linewidth=0.5, alpha=0.6)
+    ax.legend(loc="upper left", fontsize=6.5, frameon=False, labelcolor=CHART_COLORS["text"])
+    fig.tight_layout(pad=0.6)
+
+    buf = BytesIO()
+    fig.savefig(buf, format="png", transparent=True)
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("ascii")
+
+
+def render_charts_section(chart_df: pd.DataFrame | None, signals_df: pd.DataFrame | None) -> str:
+    if chart_df is None or chart_df.empty or signals_df is None or signals_df.empty:
+        return '<p class="empty">チャート表示対象のデータがありません。</p>'
+
+    # 銘柄ごとに最新の発生日をクロス表示位置として使う
+    latest_signal_date = (
+        signals_df.sort_values("発生日").groupby("ティッカー")["発生日"].last().to_dict()
+    )
+
+    cards = []
+    for ticker in chart_df["ティッカー"].unique():
+        sub = chart_df[chart_df["ティッカー"] == ticker].sort_values("Date")
+        if sub.empty:
+            continue
+        cross_date = latest_signal_date.get(ticker, "")
+        img_b64 = render_chart(sub, cross_date)
+        cards.append(f"""
+<div class="chart-card">
+  <div class="chart-title">{ticker}</div>
+  <img src="data:image/png;base64,{img_b64}" alt="{ticker} EMA chart" loading="lazy">
+</div>
+""")
+
+    return f'<div class="chart-grid">{"".join(cards)}</div>'
+
+
+def render_approaching(df: pd.DataFrame | None) -> str:
+    if df is None or df.empty:
+        return '<p class="empty">現在、接近中のクロスはありません。</p>'
+
+    df = df.sort_values("乖離率(%)")
+    rows = []
+    for _, r in df.iterrows():
+        category = CATEGORY_LABEL.get(r["カテゴリ"], r["カテゴリ"])
+        rows.append(
+            "<tr>"
+            f'<td class="ticker">{r["ティッカー"]}</td>'
+            f"<td>{category}</td>"
+            f"<td>{signal_badge(r['接近中のシグナル'])}</td>"
+            f'<td class="num">{r["乖離率(%)"]}%</td>'
+            f'<td class="num">${r["終値"]}</td>'
+            "</tr>"
+        )
+    return f"""
+<table>
+  <thead>
+    <tr><th>ティッカー</th><th>カテゴリ</th><th>接近中のシグナル</th><th>乖離率</th><th>終値</th></tr>
+  </thead>
+  <tbody>
+    {''.join(rows)}
+  </tbody>
+</table>
+"""
+
+
+def load_track_record() -> list:
+    if not os.path.exists(TRACK_RECORD_FILE):
+        return []
+    try:
+        with open(TRACK_RECORD_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def render_track_record(records: list) -> str:
+    if not records:
+        return '<p class="empty">まだ記録がありません（アクション対象シグナルが発生すると自動で記録が始まります）。</p>'
+
+    resolved = [r for r in records if r.get("resolved")]
+    pending = [r for r in records if not r.get("resolved")]
+
+    parts = []
+    if resolved:
+        recent = resolved[-20:]
+        win_rate = sum(1 for r in recent if r["return_pct"] > 0) / len(recent) * 100
+        mean = sum(r["return_pct"] for r in recent) / len(recent)
+        parts.append(f"""
+<div class="cards">
+<div class="card">
+  <div class="card-label">実運用シグナルの実績（直近{len(recent)}件）</div>
+  <div class="card-main">{win_rate:.1f}<span class="unit">% 勝率</span></div>
+  <div class="card-sub">平均リターン {mean:+.2f}% ・ 累計記録{len(records)}件（うち確定{len(resolved)}件）</div>
+</div>
+</div>
+""")
+        rows = []
+        for r in reversed(recent):
+            win = r["return_pct"] > 0
+            cls = "badge-golden" if win else "badge-dead"
+            label = "的中" if win else "外れ"
+            rows.append(
+                "<tr>"
+                f'<td class="ticker">{r["ticker"]}</td>'
+                f"<td>{signal_badge(r['signal'])}</td>"
+                f'<td>{r["entry_date"]} → {r["exit_date"]}</td>'
+                f'<td class="num">{r["return_pct"]:+.2f}%</td>'
+                f'<td><span class="badge {cls}">{label}</span></td>'
+                "</tr>"
+            )
+        parts.append(f"""
+<table>
+  <thead>
+    <tr><th>ティッカー</th><th>シグナル</th><th>期間</th><th>リターン</th><th>結果</th></tr>
+  </thead>
+  <tbody>
+    {''.join(rows)}
+  </tbody>
+</table>
+""")
+
+    if pending:
+        parts.append(f'<p class="meta" style="margin-top:12px">結果確定待ち: {len(pending)}件（発生から10営業日経過後に確定します）</p>')
+
+    return "".join(parts)
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     signals_df = load_csv(SIGNALS_CSV)
     backtest_df = load_csv(BACKTEST_CSV)
+    approaching_df = load_csv(APPROACHING_CSV)
+    chart_df = load_csv(CHART_DATA_CSV)
+    track_records = load_track_record()
 
     updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -255,6 +426,20 @@ def main():
   }}
   .scroll {{ overflow-x: auto; }}
   a {{ color: var(--accent); }}
+
+  .chart-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 12px;
+  }}
+  .chart-card {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px 4px;
+  }}
+  .chart-title {{ font-weight: 700; font-size: 0.85rem; margin-bottom: 2px; }}
+  .chart-card img {{ width: 100%; height: auto; display: block; }}
 </style>
 </head>
 <body>
@@ -264,6 +449,15 @@ def main():
 
   <h2>直近5営業日のシグナル</h2>
   <div class="scroll">{render_signals_table(signals_df)}</div>
+
+  <h2>📈 EMAチャート</h2>
+  {render_charts_section(chart_df, signals_df)}
+
+  <h2>⚠️ クロス接近中（早期警告）</h2>
+  <div class="scroll">{render_approaching(approaching_df)}</div>
+
+  <h2>✅ シグナルの実運用実績</h2>
+  <div class="scroll">{render_track_record(track_records)}</div>
 
   <h2>バックテスト概要</h2>
   <div class="scroll">{render_backtest_summary(backtest_df)}</div>

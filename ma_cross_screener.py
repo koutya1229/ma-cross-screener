@@ -4,6 +4,10 @@
   + 商品タイプ別（通常ETF/株 vs レバレッジ/インバース）の分析
   + 下落相場（2018年Q4, 2020年コロナショック, 2022年弱気相場）を含む
     長期データでのバックテスト機能
+  + 推奨アクション（資金配分シミュレーション、実勢為替レート反映）
+  + クロス接近の早期警告
+  + シグナルの実運用成績トラッキング（signal_track_record.json に永続化）
+  + レポート用チャートデータ出力
 
 必要ライブラリ:
     pip install yfinance pandas numpy
@@ -12,10 +16,16 @@
     python ma_cross_screener.py
 
 出力:
-    ma_cross_signals.csv    直近シグナル一覧（各条件の合否つき）
-    ma_cross_backtest.csv   過去の全クロスと、各条件の合否・N日後リターン
-                            （このCSVを使えば「どの条件が本当に効くか」を後から検証可能）
+    ma_cross_signals.csv      直近シグナル一覧（各条件の合否・推奨アクションつき）
+    ma_cross_backtest.csv     過去の全クロスと、各条件の合否・N日後リターン
+                              （このCSVを使えば「どの条件が本当に効くか」を後から検証可能）
+    ma_cross_approaching.csv  まだクロスしていないが接近中の銘柄
+    ma_cross_chart_data.csv   直近シグナルが出た銘柄のEMAチャート用データ
+    signal_track_record.json 実運用シグナルの成績記録（累積・要コミット）
 """
+
+import json
+import os
 
 import yfinance as yf
 import pandas as pd
@@ -69,8 +79,19 @@ RECENT_CROSS_DAYS = 5
 TOTAL_CAPITAL_JPY = 1_000_000   # 前提となる総運用資金（円）
 RISK_PCT_PER_TRADE = 0.01       # 1トレードで許容するリスク（総資金に対する割合）
 MAX_POSITION_PCT = 0.25         # 1銘柄への投資上限（総資金に対する割合）
-USD_JPY_RATE = 150.0            # 米国株の円換算に使う概算レート（固定値、実勢とズレる場合あり）
+USD_JPY_FALLBACK_RATE = 150.0   # 実勢レートが取得できない場合に使う固定フォールバック値
 JP_STOCK_LOT_SIZE = 100         # 日本の個別株の単元株数（ETFは1口単位として扱う）
+
+# --- クロス接近の早期警告 ---
+NEAR_CROSS_THRESHOLD_PCT = 0.5  # EMA10/EMA20の乖離率がこれ未満なら「接近中」とみなす
+
+# --- チャート表示用データ ---
+CHART_LOOKBACK_DAYS = 90        # レポートに表示するチャートの表示期間
+CHART_DATA_FILE = "ma_cross_chart_data.csv"
+
+# --- シグナルの成績追跡（GitHub Actions側でコミットして永続化する） ---
+TRACK_RECORD_FILE = "signal_track_record.json"
+TRACK_RECORD_MAX_KEEP = 200     # 肥大化防止のため保持する最大件数（古いものから削除）
 
 # バックテスト開始日
 # 2018年Q4急落・2020年コロナショック・2022年弱気相場を含むよう、
@@ -234,7 +255,21 @@ def lot_size(ticker: str, category: str) -> int:
     return 1
 
 
-def position_sizing(ticker: str, category: str, price: float, stop_pct: float) -> str:
+def fetch_usd_jpy_rate() -> float:
+    """ドル円の実勢レートを取得する。取得できない場合は固定フォールバック値を返す。"""
+    try:
+        fx_df = yf.download("JPY=X", period="5d", progress=False, auto_adjust=True)
+        if isinstance(fx_df.columns, pd.MultiIndex):
+            fx_df.columns = fx_df.columns.get_level_values(0)
+        rate = float(fx_df["Close"].dropna().iloc[-1])
+        if 50 < rate < 500:
+            return rate
+    except Exception as e:
+        print(f"為替レート取得失敗（固定値{USD_JPY_FALLBACK_RATE}円にフォールバック）: {e}")
+    return USD_JPY_FALLBACK_RATE
+
+
+def position_sizing(ticker: str, category: str, price: float, stop_pct: float, fx_rate: float) -> str:
     """総資金 TOTAL_CAPITAL_JPY を前提に、1トレードあたりのリスク許容額
     （RISK_PCT_PER_TRADE）と撤退目安（stop_pct）から、具体的な株数・投資額
     を逆算する。
@@ -247,7 +282,7 @@ def position_sizing(ticker: str, category: str, price: float, stop_pct: float) -
 
     jp = is_jp_ticker(ticker)
     currency = "¥" if jp else "$"
-    fx = 1.0 if jp else USD_JPY_RATE
+    fx = 1.0 if jp else fx_rate
 
     risk_amount = TOTAL_CAPITAL_JPY * RISK_PCT_PER_TRADE / fx
     loss_per_unit = price * stop_pct / 100
@@ -273,7 +308,9 @@ def position_sizing(ticker: str, category: str, price: float, stop_pct: float) -
     return f"【{TOTAL_CAPITAL_JPY // 10000}万円運用の目安】{shares}株・{amount_str}（資金の{pct_of_capital:.1f}%）{warning}"
 
 
-def suggest_action(ticker: str, signal: str, category: str, high_confidence, atr_pct: float, price: float) -> str:
+def suggest_action(
+    ticker: str, signal: str, category: str, high_confidence, atr_pct: float, price: float, fx_rate: float
+) -> str:
     """判定結果に応じた具体的な売買アクションの目安を提示する。
 
     ATR%（過去14日の平均的な値動き幅）の2倍を、翌営業日以降の撤退（損切り）
@@ -285,7 +322,7 @@ def suggest_action(ticker: str, signal: str, category: str, high_confidence, atr
     if atr_pct is not None and not np.isnan(atr_pct):
         stop_pct = round(atr_pct * 2, 1)
     stop_note = f"翌営業日以降、終値がエントリー比-{stop_pct}%を下回ったら撤退目安" if stop_pct else ""
-    sizing_note = position_sizing(ticker, category, price, stop_pct) if stop_pct else ""
+    sizing_note = position_sizing(ticker, category, price, stop_pct, fx_rate) if stop_pct else ""
 
     if signal == "ゴールデンクロス":
         if category == "leveraged_inverse":
@@ -308,7 +345,7 @@ def suggest_action(ticker: str, signal: str, category: str, high_confidence, atr
 # 現在のシグナル表示
 # ------------------------------------------------------------
 
-def get_recent_signals(ticker: str, df: pd.DataFrame):
+def get_recent_signals(ticker: str, df: pd.DataFrame, fx_rate: float):
     crosses = find_all_crosses(df)
     cutoff_idx = len(df) - 1 - RECENT_CROSS_DAYS
     recent = [c for c in crosses if c[0] >= cutoff_idx]
@@ -324,7 +361,7 @@ def get_recent_signals(ticker: str, df: pd.DataFrame):
         category = TICKER_CATEGORY.get(ticker, "unknown")
         action = suggest_action(
             ticker, signal, category, conditions.get("high_confidence(両条件を満たす)"),
-            row.get("ATR_PCT"), float(row["Close"]),
+            row.get("ATR_PCT"), float(row["Close"]), fx_rate,
         )
         results.append({
             "ティッカー": ticker,
@@ -337,6 +374,36 @@ def get_recent_signals(ticker: str, df: pd.DataFrame):
             **conditions,
         })
     return results
+
+
+def get_approaching_crosses(ticker: str, df: pd.DataFrame):
+    """まだクロスしていないが、EMA10とEMA20が接近している銘柄を検出する
+    （NEAR_CROSS_THRESHOLD_PCT 未満の乖離率を「接近中」とみなす早期警告）。
+    直近 RECENT_CROSS_DAYS 以内に既にクロスが発生している銘柄は対象外。
+    """
+    crosses = find_all_crosses(df)
+    cutoff_idx = len(df) - 1 - RECENT_CROSS_DAYS
+    if any(idx >= cutoff_idx for idx, _ in crosses):
+        return []
+
+    latest = df.iloc[-1]
+    ema10, ema20 = latest["EMA10"], latest["EMA20"]
+    if np.isnan(ema10) or np.isnan(ema20) or ema20 == 0:
+        return []
+
+    diff_pct = abs(ema10 - ema20) / abs(ema20) * 100
+    if diff_pct > NEAR_CROSS_THRESHOLD_PCT:
+        return []
+
+    direction = "ゴールデンクロス" if ema10 < ema20 else "デッドクロス"
+    return [{
+        "ティッカー": ticker,
+        "カテゴリ": TICKER_CATEGORY.get(ticker, "unknown"),
+        "接近中のシグナル": direction,
+        "乖離率(%)": round(float(diff_pct), 2),
+        "終値": round(float(latest["Close"]), 2),
+        "日付": latest.name.strftime("%Y-%m-%d"),
+    }]
 
 
 # ------------------------------------------------------------
@@ -369,6 +436,78 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
             "return_pct": ret_pct,
             **conditions,
         })
+
+    return records
+
+
+# ------------------------------------------------------------
+# シグナルの成績追跡（実運用でのシグナルを記録し、後日結果を確定する）
+# ------------------------------------------------------------
+
+def load_track_record() -> list:
+    if os.path.exists(TRACK_RECORD_FILE):
+        try:
+            with open(TRACK_RECORD_FILE, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+
+def save_track_record(records: list) -> None:
+    # 直近分のみ保持（先頭＝古い順に格納しているため、末尾側を残す）
+    trimmed = records[-TRACK_RECORD_MAX_KEEP:]
+    with open(TRACK_RECORD_FILE, "w", encoding="utf-8") as f:
+        json.dump(trimmed, f, ensure_ascii=False, indent=2)
+
+
+def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
+    """(1) 最新バーがアクション対象シグナル（ゴールデンクロス or 高信頼度
+    デッドクロス）なら新規記録を追加し、(2) 既存の未確定記録のうち
+    BACKTEST_FORWARD_DAYS 営業日が経過したものの結果を確定する。
+    """
+    last_idx = len(df) - 1
+    crosses = find_all_crosses(df)
+
+    if crosses and crosses[-1][0] == last_idx:
+        idx, signal = crosses[-1]
+        row = df.iloc[idx]
+        conditions = evaluate_conditions(row, signal)
+        is_actionable = signal == "ゴールデンクロス" or bool(conditions.get("high_confidence(両条件を満たす)"))
+        if is_actionable:
+            entry_date = row.name.strftime("%Y-%m-%d")
+            already_logged = any(
+                r["ticker"] == ticker and r["entry_date"] == entry_date for r in records
+            )
+            if not already_logged:
+                records.append({
+                    "ticker": ticker,
+                    "category": TICKER_CATEGORY.get(ticker, "unknown"),
+                    "signal": signal,
+                    "entry_date": entry_date,
+                    "entry_price": round(float(row["Close"]), 4),
+                    "resolved": False,
+                    "exit_date": None,
+                    "return_pct": None,
+                })
+
+    date_index = {d.strftime("%Y-%m-%d"): i for i, d in enumerate(df.index)}
+    close = df["Close"].values
+    for r in records:
+        if r["resolved"] or r["ticker"] != ticker:
+            continue
+        entry_idx = date_index.get(r["entry_date"])
+        if entry_idx is None:
+            continue
+        exit_idx = entry_idx + BACKTEST_FORWARD_DAYS
+        if exit_idx >= len(df):
+            continue
+        ret = (close[exit_idx] / r["entry_price"] - 1) * 100
+        if r["signal"] == "デッドクロス":
+            ret = -ret
+        r["resolved"] = True
+        r["exit_date"] = df.index[exit_idx].strftime("%Y-%m-%d")
+        r["return_pct"] = round(float(ret), 2)
 
     return records
 
@@ -457,8 +596,14 @@ def main():
     end = datetime.today()
     start = datetime.strptime(BACKTEST_START_DATE, "%Y-%m-%d")
 
+    fx_rate = fetch_usd_jpy_rate()
+    print(f"為替レート（米国株の円換算に使用）: 1ドル = {fx_rate:.2f}円\n")
+
     all_signals = []
     all_backtest_records = []
+    all_approaching = []
+    chart_records = []
+    track_record = load_track_record()
 
     for ticker in TICKERS:
         try:
@@ -472,8 +617,18 @@ def main():
             df = sanitize_price_series(df, ticker)
             df = compute_indicators(df)
 
-            all_signals.extend(get_recent_signals(ticker, df))
+            signals = get_recent_signals(ticker, df, fx_rate)
+            all_signals.extend(signals)
             all_backtest_records.extend(backtest_ticker(ticker, df))
+            all_approaching.extend(get_approaching_crosses(ticker, df))
+            track_record = update_track_record(track_record, ticker, df)
+
+            if signals:
+                chart_df = df.tail(CHART_LOOKBACK_DAYS)[["Close", "EMA10", "EMA20"]].reset_index()
+                chart_df.columns = ["Date", "Close", "EMA10", "EMA20"]
+                chart_df["Date"] = chart_df["Date"].dt.strftime("%Y-%m-%d")
+                chart_df["ティッカー"] = ticker
+                chart_records.append(chart_df)
 
         except Exception as e:
             print(f"{ticker}: エラー ({e})")
@@ -491,6 +646,27 @@ def main():
         print("\n結果を ma_cross_signals.csv に保存しました。")
     else:
         print("直近でクロスが発生した銘柄はありませんでした。")
+
+    if all_approaching:
+        print(f"\n{'=' * 70}")
+        print("クロス接近中（早期警告）")
+        print(f"{'=' * 70}")
+        app_df = pd.DataFrame(all_approaching)
+        for _, r in app_df.iterrows():
+            print(f"[接近中] {r['ティッカー']}({r['カテゴリ']}) - {r['接近中のシグナル']}方向 "
+                  f"(乖離率{r['乖離率(%)']}%, 終値{r['終値']})")
+        app_df.to_csv("ma_cross_approaching.csv", index=False, encoding="utf-8-sig")
+
+    if chart_records:
+        pd.concat(chart_records, ignore_index=True).to_csv(
+            CHART_DATA_FILE, index=False, encoding="utf-8-sig"
+        )
+
+    save_track_record(track_record)
+    resolved_recent = [r for r in track_record if r["resolved"]][-20:]
+    if resolved_recent:
+        win_rate = sum(1 for r in resolved_recent if r["return_pct"] > 0) / len(resolved_recent) * 100
+        print(f"\n実運用シグナルの直近実績（直近{len(resolved_recent)}件）: 勝率{win_rate:.1f}%")
 
     summarize_backtest(all_backtest_records)
 
