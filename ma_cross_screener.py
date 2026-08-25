@@ -9,6 +9,10 @@
   + シグナルの実運用成績トラッキング（signal_track_record.json に永続化）
   + レポート用チャートデータ出力
   + セクター別モメンタム（「今どの市場が熱いか」の横断ウォッチ）
+  + 日足の各種指標（RSI/MACD/EMA200乖離/出来高）による追加条件の統計検証
+    （analyze_new_conditions.py。54銘柄規模での再検証の結果、デッドクロスの
+    EMA50<EMA200フィルターは leveraged_bull/plain_etf でのみ有効、個別株
+    では無効と判明。カテゴリ限定に精緻化した）
 
 必要ライブラリ:
     pip install yfinance pandas numpy
@@ -269,36 +273,66 @@ def find_all_crosses(df: pd.DataFrame):
     return crosses
 
 
-def evaluate_conditions(row: pd.Series, signal: str) -> dict:
-    """統計検証で有効性が確認された条件のみを判定する
+# デッドクロスの EMA50<EMA200 フィルターが統計的に有効なカテゴリ
+# （2015-01〜・54銘柄・3,364件で再検証。カテゴリ別に効果が大きく異なった）:
+#   leveraged_bull: 勝率65.9% vs 38.2% (z=+3.36, p=0.00078 で有意)
+#   plain_etf:      勝率52.2% vs 37.7% (z=+1.90, p=0.058  惜しくも届かず、参考程度)
+#   stock:          勝率41.3% vs 43.0% (z=-0.79, p=0.43   効果なし)
+#   leveraged_inverse: サンプル不足/有意差なし
+# 出来高条件（旧: 出来高<平均）は個別株で有意に逆効果 (p=0.022) だったため撤廃。
+DOWNTREND_FILTER_CATEGORIES = {"leveraged_bull", "plain_etf"}
 
-    検証結果（2015-01〜、下落局面3回を含む1,401件のクロスで検証）:
-      - デッドクロス: EMA50<EMA200（下降トレンド確立）で勝率65.4% vs 40.4%
-                      (z=5.78, p<0.0001 で有意)
-      - デッドクロス: 出来高が20日平均を下回る場合の方が勝率55.4% vs 41.7%
-                      (z=-3.54, p=0.0004 で有意)
-      - ゴールデンクロス: 検証した5条件はいずれも有意差なし
-                          （素のシグナルのままで勝率57.4%、フィルター不要）
 
-    このため、ゴールデンクロスは無条件のシグナルとして扱い、
-    デッドクロスのみ「高信頼度」フラグ（2条件のAND）を付与する。
+def evaluate_conditions(row: pd.Series, signal: str, category: str) -> dict:
+    """条件を判定する。「cond_」接頭辞は統計検証済みで実際にフィルターへ
+    採用している条件、「cand_」接頭辞はまだ検証中の候補条件（日足の各種
+    指標から「トレンドの厚み」を捉えようとするもの）を表す。
+
+    検証済み（analyze_new_conditions.py による再検証結果。DOWNTREND_FILTER_
+    CATEGORIES の定義コメントを参照）:
+      - デッドクロス: EMA50<EMA200 は leveraged_bull で有意、plain_etf で
+                      参考程度、個別株・レバレッジインバースでは無効
+      - ゴールデンクロス: 検証した5条件（新規のRSI/MACD/出来高/EMA200系を
+                          含む）はいずれも有意差なし（フィルター不要）
+
+    cand_ 系条件は analyze_new_conditions.py で有意性を再検証し、有意な
+    ものだけを cond_ に昇格させる想定（それまでは判定ロジックに使わない）。
     """
-    if signal == "ゴールデンクロス":
-        return {}
-
-    # デッドクロス: 統計的に有意だった2条件のみ
     downtrend_confirmed = bool(row["EMA50"] < row["EMA200"])
-    volume_not_spiking = (
+    uptrend_confirmed = bool(row["EMA50"] > row["EMA200"])
+    price_above_ema200 = bool(row["Close"] > row["EMA200"])
+    price_below_ema200 = bool(row["Close"] < row["EMA200"])
+    rsi_not_overbought = bool(row["RSI"] < RSI_OVERBOUGHT)
+    rsi_not_oversold = bool(row["RSI"] > RSI_OVERSOLD)
+    macd_bullish = bool(row["MACD_HIST"] > 0)
+    macd_bearish = bool(row["MACD_HIST"] < 0)
+    volume_spiking = (
+        bool(row["Volume"] > row["VOL_MA"]) if not np.isnan(row["VOL_MA"]) else None
+    )
+    # 出来高条件は高信頼度判定には使わないが、再検証用に引き続き記録する
+    cand_volume_not_spiking = (
         bool(row["Volume"] < row["VOL_MA"]) if not np.isnan(row["VOL_MA"]) else None
     )
-    high_confidence = bool(
-        downtrend_confirmed and (volume_not_spiking is True)
-    )
+
+    if signal == "ゴールデンクロス":
+        return {
+            "cand_uptrend_confirmed(EMA50>EMA200)": uptrend_confirmed,
+            "cand_price_above_ema200": price_above_ema200,
+            "cand_rsi_not_overbought(RSI<70)": rsi_not_overbought,
+            "cand_macd_bullish(MACD_HIST>0)": macd_bullish,
+            "cand_volume_spiking(出来高が平均超)": volume_spiking,
+        }
+
+    # デッドクロス: EMA50<EMA200 単体、かつ leveraged_bull/plain_etf のみ有効
+    high_confidence = bool(downtrend_confirmed and category in DOWNTREND_FILTER_CATEGORIES)
 
     return {
         "cond_downtrend_confirmed(EMA50<EMA200)": downtrend_confirmed,
-        "cond_volume_not_spiking(出来高が平均未満)": volume_not_spiking,
-        "high_confidence(両条件を満たす)": high_confidence,
+        "high_confidence(EMA50<EMA200、レバ/ETF限定)": high_confidence,
+        "cand_volume_not_spiking(出来高が平均未満)": cand_volume_not_spiking,
+        "cand_price_below_ema200": price_below_ema200,
+        "cand_rsi_not_oversold(RSI>30)": rsi_not_oversold,
+        "cand_macd_bearish(MACD_HIST<0)": macd_bearish,
     }
 
 
@@ -413,14 +447,14 @@ def get_recent_signals(ticker: str, df: pd.DataFrame, fx_rate: float):
     results = []
     for idx, signal in recent:
         row = df.iloc[idx]
-        conditions = evaluate_conditions(row, signal)
+        category = TICKER_CATEGORY.get(ticker, "unknown")
+        conditions = evaluate_conditions(row, signal, category)
         if signal == "ゴールデンクロス":
             note = "フィルター不要（素のシグナルで勝率57.4%）"
         else:
-            note = "高信頼度" if conditions.get("high_confidence(両条件を満たす)") else "低信頼度（見送り推奨）"
-        category = TICKER_CATEGORY.get(ticker, "unknown")
+            note = "高信頼度" if conditions.get("high_confidence(EMA50<EMA200、レバ/ETF限定)") else "低信頼度（見送り推奨）"
         action = suggest_action(
-            ticker, signal, category, conditions.get("high_confidence(両条件を満たす)"),
+            ticker, signal, category, conditions.get("high_confidence(EMA50<EMA200、レバ/ETF限定)"),
             row.get("ATR_PCT"), float(row["Close"]), fx_rate,
         )
         results.append({
@@ -496,12 +530,13 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
     crosses = find_all_crosses(df)
     records = []
     close = df["Close"].values
+    category = TICKER_CATEGORY.get(ticker, "unknown")
 
     for idx, signal in crosses:
         if idx + BACKTEST_FORWARD_DAYS >= len(df):
             continue
         row = df.iloc[idx]
-        conditions = evaluate_conditions(row, signal)
+        conditions = evaluate_conditions(row, signal, category)
 
         entry_price = close[idx]
         exit_price = close[idx + BACKTEST_FORWARD_DAYS]
@@ -511,7 +546,7 @@ def backtest_ticker(ticker: str, df: pd.DataFrame):
 
         records.append({
             "ticker": ticker,
-            "category": TICKER_CATEGORY.get(ticker, "unknown"),
+            "category": category,
             "signal": signal,
             "date": row.name.strftime("%Y-%m-%d"),
             "regime": label_market_regime(row.name),
@@ -554,8 +589,9 @@ def update_track_record(records: list, ticker: str, df: pd.DataFrame) -> list:
     if crosses and crosses[-1][0] == last_idx:
         idx, signal = crosses[-1]
         row = df.iloc[idx]
-        conditions = evaluate_conditions(row, signal)
-        is_actionable = signal == "ゴールデンクロス" or bool(conditions.get("high_confidence(両条件を満たす)"))
+        category = TICKER_CATEGORY.get(ticker, "unknown")
+        conditions = evaluate_conditions(row, signal, category)
+        is_actionable = signal == "ゴールデンクロス" or bool(conditions.get("high_confidence(EMA50<EMA200、レバ/ETF限定)"))
         if is_actionable:
             entry_date = row.name.strftime("%Y-%m-%d")
             already_logged = any(
@@ -620,13 +656,13 @@ def summarize_backtest(all_records: list):
 
     # --- デッドクロスの絞り込み効果（high_confidence フラグの有無で比較） ---
     print(f"\n{'-' * 70}")
-    print("デッドクロス絞り込みの効果（高信頼度フラグ：EMA50<EMA200 かつ 出来高<平均）")
+    print("デッドクロス絞り込みの効果（高信頼度フラグ：EMA50<EMA200、レバレッジ/通常ETF限定）")
     print(f"{'-' * 70}")
     dc = bt_df[bt_df["signal"] == "デッドクロス"]
-    if not dc.empty and "high_confidence(両条件を満たす)" in dc.columns:
-        valid = dc[dc["high_confidence(両条件を満たす)"].notna()]
-        hi = valid[valid["high_confidence(両条件を満たす)"] == True]
-        lo = valid[valid["high_confidence(両条件を満たす)"] == False]
+    if not dc.empty and "high_confidence(EMA50<EMA200、レバ/ETF限定)" in dc.columns:
+        valid = dc[dc["high_confidence(EMA50<EMA200、レバ/ETF限定)"].notna()]
+        hi = valid[valid["high_confidence(EMA50<EMA200、レバ/ETF限定)"] == True]
+        lo = valid[valid["high_confidence(EMA50<EMA200、レバ/ETF限定)"] == False]
         if not hi.empty:
             print(f"  高信頼度(n={len(hi)}): 平均={hi['return_pct'].mean():.2f}% "
                   f"中央値={hi['return_pct'].median():.2f}% 勝率={(hi['return_pct']>0).mean()*100:.1f}% "

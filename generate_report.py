@@ -124,10 +124,10 @@ def render_backtest_summary(df: pd.DataFrame | None) -> str:
         stat_card("デッドクロス（全体）", dead),
     ]
 
-    if "high_confidence(両条件を満たす)" in dead.columns:
-        valid = dead[dead["high_confidence(両条件を満たす)"].notna()]
-        hi = valid[valid["high_confidence(両条件を満たす)"] == True]  # noqa: E712
-        lo = valid[valid["high_confidence(両条件を満たす)"] == False]  # noqa: E712
+    if "high_confidence(EMA50<EMA200、レバ/ETF限定)" in dead.columns:
+        valid = dead[dead["high_confidence(EMA50<EMA200、レバ/ETF限定)"].notna()]
+        hi = valid[valid["high_confidence(EMA50<EMA200、レバ/ETF限定)"] == True]  # noqa: E712
+        lo = valid[valid["high_confidence(EMA50<EMA200、レバ/ETF限定)"] == False]  # noqa: E712
         cards.append(stat_card("デッドクロス・高信頼度", hi))
         cards.append(stat_card("デッドクロス・低信頼度", lo))
 
