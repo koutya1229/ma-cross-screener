@@ -39,6 +39,54 @@ def build_click_url() -> str | None:
     return None
 
 
+def send_ntfy(topic: str, *, data: bytes, headers: dict, method: str = "POST") -> int:
+    """headers の値は str(ASCIIのみ想定) または bytes(UTF-8などを含む場合は
+    呼び出し側で明示的に .encode() したもの)。urllib/http.client は str の
+    ヘッダー値を latin-1 でエンコードするため、日本語など非ASCII文字を含む
+    値は事前に bytes 化しておく必要がある。
+    """
+    req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return resp.status
+
+
+def send_summary(topic: str, latest_date: str, rows: list) -> None:
+    msg = build_message(latest_date, rows)
+    print(msg)
+
+    tickers_summary = ", ".join(r["ティッカー"] for r in rows)
+    headers = {
+        "Title": f"Golden Cross: {tickers_summary}"[:250],
+        "Tags": "rocket,chart_with_upwards_trend",
+        "Priority": "high",
+        "Markdown": "yes",
+    }
+    click_url = build_click_url()
+    if click_url:
+        headers["Click"] = click_url
+
+    status = send_ntfy(topic, data=msg.encode("utf-8"), headers=headers, method="POST")
+    print(f"ntfy.sh summary response: {status}")
+
+
+def send_attachment(topic: str, csv_path: str, latest_date: str) -> None:
+    if not os.path.exists(csv_path):
+        return
+
+    caption = f"{latest_date} 時点の全シグナル詳細データです（判定・各条件の合否つき）"
+    headers = {
+        "Filename": os.path.basename(csv_path),
+        "Title": "Signal details (CSV)",
+        "Message": caption.encode("utf-8"),
+        "Tags": "page_facing_up",
+    }
+    with open(csv_path, "rb") as f:
+        data = f.read()
+
+    status = send_ntfy(topic, data=data, headers=headers, method="PUT")
+    print(f"ntfy.sh attachment response: {status}")
+
+
 def main():
     topic = os.environ.get("NTFY_TOPIC")
     if not topic:
@@ -60,29 +108,8 @@ def main():
     latest_date = max(r["発生日"] for r in golden)
     latest = [r for r in golden if r["発生日"] == latest_date]
 
-    msg = build_message(latest_date, latest)
-    print(msg)
-
-    tickers_summary = ", ".join(r["ティッカー"] for r in latest)
-
-    headers = {
-        "Title": f"Golden Cross: {tickers_summary}"[:250],
-        "Tags": "rocket,chart_with_upwards_trend",
-        "Priority": "high",
-        "Markdown": "yes",
-    }
-    click_url = build_click_url()
-    if click_url:
-        headers["Click"] = click_url
-
-    req = urllib.request.Request(
-        f"https://ntfy.sh/{topic}",
-        data=msg.encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        print(f"ntfy.sh response: {resp.status}")
+    send_summary(topic, latest_date, latest)
+    send_attachment(topic, SIGNALS_CSV, latest_date)
 
 
 if __name__ == "__main__":
