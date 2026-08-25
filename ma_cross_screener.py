@@ -82,6 +82,11 @@ MAX_POSITION_PCT = 0.25         # 1銘柄への投資上限（総資金に対す
 USD_JPY_FALLBACK_RATE = 150.0   # 実勢レートが取得できない場合に使う固定フォールバック値
 JP_STOCK_LOT_SIZE = 100         # 日本の個別株の単元株数（ETFは1口単位として扱う）
 
+# 楽天証券の米国株式信用取引は「レバレッジ型・インバース型でないこと」が
+# 対象条件のため、この5銘柄は空売り不可（現物保有分の売却のみ可能）。
+# 他の証券会社・条件では扱いが異なる場合があるため、必要に応じて調整すること。
+MARGIN_SHORT_INELIGIBLE = {"SOXL", "SOXS", "TQQQ", "SQQQ", "SPXL"}
+
 # --- クロス接近の早期警告 ---
 NEAR_CROSS_THRESHOLD_PCT = 0.5  # EMA10/EMA20の乖離率がこれ未満なら「接近中」とみなす
 
@@ -335,6 +340,8 @@ def suggest_action(
 
     # デッドクロス
     if high_confidence:
+        if ticker in MARGIN_SHORT_INELIGIBLE:
+            return "空売り不可（レバレッジ/インバース型は米国株信用取引の対象外）。現物保有していれば売却を検討、新規の売りポジションは持てません"
         base = "空売り、または保有株の利確・損切りを検討。10営業日後を目安に手仕舞い"
         parts = [p for p in [base, stop_note, sizing_note] if p]
         return "。".join(parts)
