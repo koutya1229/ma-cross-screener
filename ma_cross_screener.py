@@ -65,6 +65,13 @@ MACD_FAST, MACD_SLOW, MACD_SIGNAL = 12, 26, 9
 
 RECENT_CROSS_DAYS = 5
 
+# --- 資金配分シミュレーション（推奨アクションの参考情報として表示） ---
+TOTAL_CAPITAL_JPY = 1_000_000   # 前提となる総運用資金（円）
+RISK_PCT_PER_TRADE = 0.01       # 1トレードで許容するリスク（総資金に対する割合）
+MAX_POSITION_PCT = 0.25         # 1銘柄への投資上限（総資金に対する割合）
+USD_JPY_RATE = 150.0            # 米国株の円換算に使う概算レート（固定値、実勢とズレる場合あり）
+JP_STOCK_LOT_SIZE = 100         # 日本の個別株の単元株数（ETFは1口単位として扱う）
+
 # バックテスト開始日
 # 2018年Q4急落・2020年コロナショック・2022年弱気相場を含むよう、
 # 過去分をさかのぼって取得する（前回は2024年10月以降＝ほぼ上昇相場のみだった）
@@ -216,6 +223,87 @@ def evaluate_conditions(row: pd.Series, signal: str) -> dict:
     }
 
 
+def is_jp_ticker(ticker: str) -> bool:
+    return ticker.endswith(".T")
+
+
+def lot_size(ticker: str, category: str) -> int:
+    # 日本の個別株のみ単元株（100株）単位。ETF・米国株は1単位として扱う。
+    if is_jp_ticker(ticker) and category == "stock":
+        return JP_STOCK_LOT_SIZE
+    return 1
+
+
+def position_sizing(ticker: str, category: str, price: float, stop_pct: float) -> str:
+    """総資金 TOTAL_CAPITAL_JPY を前提に、1トレードあたりのリスク許容額
+    （RISK_PCT_PER_TRADE）と撤退目安（stop_pct）から、具体的な株数・投資額
+    を逆算する。
+
+    計算式: 購入株数 ≒ リスク許容額 ÷ (価格 × 撤退%)
+    1銘柄への投資額は MAX_POSITION_PCT を超えないようキャップする。
+    """
+    if price is None or np.isnan(price) or not stop_pct:
+        return ""
+
+    jp = is_jp_ticker(ticker)
+    currency = "¥" if jp else "$"
+    fx = 1.0 if jp else USD_JPY_RATE
+
+    risk_amount = TOTAL_CAPITAL_JPY * RISK_PCT_PER_TRADE / fx
+    loss_per_unit = price * stop_pct / 100
+    if loss_per_unit <= 0:
+        return ""
+
+    lot = lot_size(ticker, category)
+    shares = max(lot, int((risk_amount / loss_per_unit) // lot) * lot)
+
+    cap_amount = TOTAL_CAPITAL_JPY * MAX_POSITION_PCT / fx
+    while shares > lot and shares * price > cap_amount:
+        shares -= lot
+
+    investment = shares * price
+    capital_native = TOTAL_CAPITAL_JPY / fx
+    pct_of_capital = investment / capital_native * 100
+    amount_str = f"{currency}{investment:,.0f}" if jp else f"{currency}{investment:,.1f}"
+
+    warning = ""
+    if pct_of_capital > MAX_POSITION_PCT * 100:
+        warning = "（単元株の制約で上限超過、資金配分に注意）"
+
+    return f"【{TOTAL_CAPITAL_JPY // 10000}万円運用の目安】{shares}株・{amount_str}（資金の{pct_of_capital:.1f}%）{warning}"
+
+
+def suggest_action(ticker: str, signal: str, category: str, high_confidence, atr_pct: float, price: float) -> str:
+    """判定結果に応じた具体的な売買アクションの目安を提示する。
+
+    ATR%（過去14日の平均的な値動き幅）の2倍を、翌営業日以降の撤退（損切り）
+    目安として使う（一般的なボラティリティ連動ストップの考え方）。
+    バックテストの傾向（[[category]]別の勝率・標準偏差）を踏まえた参考情報
+    であり、投資助言ではない。
+    """
+    stop_pct = None
+    if atr_pct is not None and not np.isnan(atr_pct):
+        stop_pct = round(atr_pct * 2, 1)
+    stop_note = f"翌営業日以降、終値がエントリー比-{stop_pct}%を下回ったら撤退目安" if stop_pct else ""
+    sizing_note = position_sizing(ticker, category, price, stop_pct) if stop_pct else ""
+
+    if signal == "ゴールデンクロス":
+        if category == "leveraged_inverse":
+            return "統計的に不利（過去勝率37%程度）。見送り推奨"
+        action = "翌営業日の始値付近で買い、10営業日後を目安に手仕舞い"
+        if category == "leveraged_bull":
+            action += "。値動きが大きいため通常より小さめの数量で"
+        parts = [p for p in [action, stop_note, sizing_note] if p]
+        return "。".join(parts)
+
+    # デッドクロス
+    if high_confidence:
+        base = "空売り、または保有株の利確・損切りを検討。10営業日後を目安に手仕舞い"
+        parts = [p for p in [base, stop_note, sizing_note] if p]
+        return "。".join(parts)
+    return "見送り推奨。ノーアクションが無難"
+
+
 # ------------------------------------------------------------
 # 現在のシグナル表示
 # ------------------------------------------------------------
@@ -233,13 +321,19 @@ def get_recent_signals(ticker: str, df: pd.DataFrame):
             note = "フィルター不要（素のシグナルで勝率57.4%）"
         else:
             note = "高信頼度" if conditions.get("high_confidence(両条件を満たす)") else "低信頼度（見送り推奨）"
+        category = TICKER_CATEGORY.get(ticker, "unknown")
+        action = suggest_action(
+            ticker, signal, category, conditions.get("high_confidence(両条件を満たす)"),
+            row.get("ATR_PCT"), float(row["Close"]),
+        )
         results.append({
             "ティッカー": ticker,
-            "カテゴリ": TICKER_CATEGORY.get(ticker, "unknown"),
+            "カテゴリ": category,
             "シグナル": signal,
             "発生日": row.name.strftime("%Y-%m-%d"),
             "終値": round(float(row["Close"]), 2),
             "判定": note,
+            "推奨アクション": action,
             **conditions,
         })
     return results

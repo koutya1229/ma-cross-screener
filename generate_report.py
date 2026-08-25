@@ -52,6 +52,7 @@ def render_signals_table(df: pd.DataFrame | None) -> str:
     rows = []
     for _, r in df.iterrows():
         category = CATEGORY_LABEL.get(r["カテゴリ"], r["カテゴリ"])
+        action = r["推奨アクション"] if "推奨アクション" in df.columns and pd.notna(r.get("推奨アクション")) else "-"
         rows.append(
             "<tr>"
             f'<td class="ticker">{r["ティッカー"]}</td>'
@@ -60,12 +61,13 @@ def render_signals_table(df: pd.DataFrame | None) -> str:
             f'<td>{r["発生日"]}</td>'
             f'<td class="num">${r["終値"]}</td>'
             f"<td>{verdict_badge(r['判定'])}</td>"
+            f'<td class="action">{action}</td>'
             "</tr>"
         )
     return f"""
 <table>
   <thead>
-    <tr><th>ティッカー</th><th>カテゴリ</th><th>シグナル</th><th>発生日</th><th>終値</th><th>判定</th></tr>
+    <tr><th>ティッカー</th><th>カテゴリ</th><th>シグナル</th><th>発生日</th><th>終値</th><th>判定</th><th>推奨アクション</th></tr>
   </thead>
   <tbody>
     {''.join(rows)}
@@ -207,6 +209,7 @@ def main():
   tr:last-child td {{ border-bottom: none; }}
   td.ticker {{ font-weight: 700; }}
   td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+  td.action {{ white-space: normal; min-width: 260px; color: var(--text-dim); font-size: 0.85rem; line-height: 1.5; }}
   th:nth-child(3), td:nth-child(3) {{ text-align: right; }}
   th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) {{ text-align: right; }}
 
