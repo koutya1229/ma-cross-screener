@@ -46,5 +46,33 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "SOXS",
+    "category": "leveraged_inverse",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-08-28",
+    "entry_price": 49.82,
+    "stop_pct": 22.2,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "AAPL",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-08-28",
+    "entry_price": 319.7,
+    "stop_pct": 4.5,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
