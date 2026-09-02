@@ -116,5 +116,19 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "1357.T",
+    "category": "leveraged_inverse",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-02",
+    "entry_price": 2902.0,
+    "stop_pct": 8.5,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
