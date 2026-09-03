@@ -130,5 +130,47 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "QQQ",
+    "category": "plain_etf",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-03",
+    "entry_price": 717.67,
+    "stop_pct": 2.7,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "3382.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-03",
+    "entry_price": 2060.0,
+    "stop_pct": 4.1,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "8267.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-03",
+    "entry_price": 1390.5,
+    "stop_pct": 4.8,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
