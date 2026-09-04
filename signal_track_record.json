@@ -172,5 +172,19 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "TSM",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-04",
+    "entry_price": 428.91,
+    "stop_pct": 5.4,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
