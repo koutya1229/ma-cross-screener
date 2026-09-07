@@ -186,5 +186,19 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "9984.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-07",
+    "entry_price": 6217.0,
+    "stop_pct": 11.5,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
