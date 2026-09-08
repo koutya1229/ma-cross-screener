@@ -5,9 +5,12 @@
     "signal": "ゴールデンクロス",
     "entry_date": "2026-08-25",
     "entry_price": 1395.5,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null
+    "resolved": true,
+    "exit_date": "2026-09-08",
+    "return_pct": 1.9,
+    "stopped_out": false,
+    "exit_reason": "fixed_hold",
+    "phase": "resolved"
   },
   {
     "ticker": "TSM",
@@ -194,6 +197,20 @@
     "entry_date": "2026-09-07",
     "entry_price": 6217.0,
     "stop_pct": 11.5,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "TQQQ",
+    "category": "leveraged_bull",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-08",
+    "entry_price": 72.16,
+    "stop_pct": 7.6,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
