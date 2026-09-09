@@ -18,9 +18,12 @@
     "signal": "ゴールデンクロス",
     "entry_date": "2026-08-25",
     "entry_price": 418.95,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null
+    "resolved": true,
+    "exit_date": "2026-09-09",
+    "return_pct": 3.92,
+    "stopped_out": false,
+    "exit_reason": "fixed_hold",
+    "phase": "resolved"
   },
   {
     "ticker": "TQQQ",
@@ -211,6 +214,20 @@
     "entry_date": "2026-09-08",
     "entry_price": 72.16,
     "stop_pct": 7.6,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "AMD",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-09",
+    "entry_price": 521.095,
+    "stop_pct": 8.9,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
