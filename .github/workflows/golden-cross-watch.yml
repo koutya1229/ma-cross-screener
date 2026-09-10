@@ -2,8 +2,8 @@ name: Golden Cross Watch
 
 on:
   schedule:
-    # 08:00 JST = 23:00 UTC(前日)
-    - cron: "0 23 * * *"
+    # 18:00 JST = 09:00 UTC
+    - cron: "0 9 * * *"
   workflow_dispatch: {}
 
 permissions:
