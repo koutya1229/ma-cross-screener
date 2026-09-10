@@ -38,10 +38,12 @@ jobs:
         with:
           path: _site
 
-      - name: Notify on signal (golden cross / high-confidence dead cross)
-        env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python notify_signals.py
+      # 32銘柄のEMA10/20クロス通知は一時停止中（SOXL通知のみ運用）。
+      # 再開するには下の2ステップのコメントを外す。
+      # - name: Notify on signal (golden cross / high-confidence dead cross)
+      #   env:
+      #     NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+      #   run: python notify_signals.py
 
       - name: Run SOXL 4-signal watch (golden cross / 200d reclaim / RSI recovery / in-trend MACD cross)
         run: python soxl_signal_watch.py
@@ -51,10 +53,11 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python notify_soxl_signals.py
 
-      - name: Weekly digest (Mondays only)
-        env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python weekly_digest.py
+      # 32銘柄の週次サマリー通知も一時停止中。
+      # - name: Weekly digest (Mondays only)
+      #   env:
+      #     NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+      #   run: python weekly_digest.py
 
       - name: Commit signal track record
         run: |
