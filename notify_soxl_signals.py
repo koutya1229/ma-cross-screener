@@ -30,14 +30,15 @@ def send_ntfy(topic: str, *, data: bytes, headers: dict, method: str = "POST") -
 
 
 def build_message(rows: list) -> str:
-    lines = ["## SOXL 買いシグナル検出", ""]
+    lines = ["## 買いシグナル検出（SOXL / 1458 / 1459）", ""]
     for r in rows:
-        lines.append(f"- **{r['シグナル']}** — 終値 ${r['終値']} (RSI {r['RSI']}, {r['発生日']})")
+        ticker = r.get("ティッカー", "SOXL")
+        lines.append(f"- **{ticker}｜{r['シグナル']}** — 終値 {r['終値']} (RSI {r['RSI']}, {r['発生日']})")
     lines.append("")
     lines.append(
         "_中期トレンド判定(EMA50/EMA200・RSI(14)・MACD)に基づく参考シグナルです。"
-        "過去の検証(2021〜2026年週足)では発生件数が1〜4件と少なく統計的信頼性は"
-        "限定的。投資助言ではありません。_"
+        "過去の検証(2021〜2026年週足, SOXL)では発生件数が1〜4件と少なく統計的信頼性は"
+        "限定的。1458/1459はバックテスト未実施。投資助言ではありません。_"
     )
     return "\n".join(lines)
 
@@ -63,7 +64,7 @@ def main() -> None:
     print(msg)
 
     headers = {
-        "Title": "SOXL Signal Detected",
+        "Title": "Trend Signal Detected (SOXL/1458/1459)",
         "Tags": "rocket",
         "Priority": "high",
         "Markdown": "yes",

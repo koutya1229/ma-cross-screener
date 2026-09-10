@@ -1,9 +1,12 @@
 """
-SOXL 専用: 4種類のトレンドフォロー買いシグナル監視スクリプト
+トレンドフォロー買いシグナル監視スクリプト（SOXL / 1458 / 1459）
 
 ma_cross_screener.py の EMA10/EMA20クロス（"ゴールデンクロス"/"デッドクロス"、
 数百〜数千件規模で統計検証済み）とは別に、Claudeとのチャットで行った週足
 バックテスト（2021〜2026年, SOXL）に基づく4つのシグナルを日足ベースで監視する。
+
+もともとSOXL専用だったが、同条件で日経レバレッジ型ETF（1458 / 1459）も
+監視対象に追加した。
 
 ma_cross_screener.py 側の「ゴールデンクロス」（EMA10>EMA20への転換）とは
 定義が異なる点に注意。こちらは中期トレンド（EMA50/EMA200）ベースの、より
@@ -11,7 +14,8 @@ ma_cross_screener.py 側の「ゴールデンクロス」（EMA10>EMA20への転
 
 過去のバックテストでの発生件数は1〜4件と非常に少なく、既存のEMA10/20クロス
 ほどの統計的信頼性はない。あくまで参考シグナルとして扱うこと（詳細は
-2026年9月のチャットでの検証結果を参照）。
+2026年9月のチャットでの検証結果を参照）。SOXL以外の銘柄については
+バックテストも行っていないため、さらに参考程度。
 
 シグナル定義（いずれも ma_cross_screener.py の compute_indicators() が計算する
 EMA50 / EMA200 / RSI(14) / MACD(12,26,9) を流用）:
@@ -43,7 +47,13 @@ import yfinance as yf
 
 from ma_cross_screener import RSI_OVERSOLD, compute_indicators, sanitize_price_series
 
-TICKER = "SOXL"
+# 監視対象: yfinanceティッカー -> 通知に表示する名前
+TICKERS = {
+    "SOXL": "SOXL",
+    "1458.T": "日経レバレッジ(1458)",
+    "1459.T": "日経ダブルインバース(1459)",
+}
+
 START_DATE = "2018-01-01"   # EMA200のウォームアップに十分な期間を確保
 RECENT_DAYS = 3             # 直近何営業日以内のシグナルを「新規」とみなすか
 OUTPUT_CSV = "soxl_signal_watch.csv"
@@ -90,18 +100,15 @@ def find_signals(df: pd.DataFrame) -> list[tuple[int, str]]:
     return signals
 
 
-def main() -> None:
-    end = datetime.today()
-    start = datetime.strptime(START_DATE, "%Y-%m-%d")
-
-    df = yf.download(TICKER, start=start, end=end, progress=False, auto_adjust=True)
+def scan_ticker(ticker: str, label: str, start: datetime, end: datetime) -> list[dict]:
+    df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
     if df.empty:
-        print(f"{TICKER}: データ取得失敗")
-        return
+        print(f"{label}: データ取得失敗")
+        return []
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
-    df = sanitize_price_series(df, TICKER)
+    df = sanitize_price_series(df, ticker)
     df = compute_indicators(df)
 
     signals = find_signals(df)
@@ -109,22 +116,36 @@ def main() -> None:
     recent = [(i, s) for i, s in signals if i >= cutoff_idx]
 
     if not recent:
-        print(f"{TICKER}: 直近{RECENT_DAYS}営業日以内の新規シグナルなし（4種とも）")
-        return
+        print(f"{label}: 直近{RECENT_DAYS}営業日以内の新規シグナルなし（4種とも）")
+        return []
 
     rows = []
     for i, sig in recent:
         row = df.iloc[i]
         rows.append({
-            "ティッカー": TICKER,
+            "ティッカー": label,
             "シグナル": sig,
             "発生日": row.name.strftime("%Y-%m-%d"),
             "終値": round(float(row["Close"]), 2),
             "RSI": round(float(row["RSI"]), 1),
         })
-        print(f"[{sig}] {TICKER} ({row.name.date()}, 終値{row['Close']:.2f}, RSI{row['RSI']:.1f})")
+        print(f"[{sig}] {label} ({row.name.date()}, 終値{row['Close']:.2f}, RSI{row['RSI']:.1f})")
+    return rows
 
-    pd.DataFrame(rows).to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
+
+def main() -> None:
+    end = datetime.today()
+    start = datetime.strptime(START_DATE, "%Y-%m-%d")
+
+    all_rows: list[dict] = []
+    for ticker, label in TICKERS.items():
+        all_rows.extend(scan_ticker(ticker, label, start, end))
+
+    if not all_rows:
+        print(f"新規シグナルなし（{'/'.join(TICKERS.values())}, 4種とも）")
+        return
+
+    pd.DataFrame(all_rows).to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
     print(f"\n結果を {OUTPUT_CSV} に保存しました。")
 
 
