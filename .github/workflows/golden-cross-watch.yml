@@ -53,6 +53,22 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python notify_soxl_signals.py
 
+      - name: Run 1458 signal watch (buy signals)
+        run: python 1458_signal_watch.py
+
+      - name: Notify on 1458 signal
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python notify_1458_signals.py
+
+      - name: Run 1459 short signal watch (sell/short signals)
+        run: python 1459_short_signal_watch.py
+
+      - name: Notify on 1459 short signal
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python notify_1459_short_signals.py
+
       # 32銘柄の週次サマリー通知も一時停止中。
       # - name: Weekly digest (Mondays only)
       #   env:
