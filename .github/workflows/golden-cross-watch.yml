@@ -43,6 +43,14 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python notify_signals.py
 
+      - name: Run SOXL 4-signal watch (golden cross / 200d reclaim / RSI recovery / in-trend MACD cross)
+        run: python soxl_signal_watch.py
+
+      - name: Notify on SOXL signal
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python notify_soxl_signals.py
+
       - name: Weekly digest (Mondays only)
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
