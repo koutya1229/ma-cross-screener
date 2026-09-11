@@ -93,7 +93,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "8411.T",
@@ -107,7 +107,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "4188.T",
