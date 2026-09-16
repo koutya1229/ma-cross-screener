@@ -135,7 +135,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "QQQ",
@@ -270,6 +270,20 @@
     "entry_date": "2026-09-15",
     "entry_price": 2836.5,
     "stop_pct": 5.3,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "7267.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-16",
+    "entry_price": 1684.5,
+    "stop_pct": 5.2,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
