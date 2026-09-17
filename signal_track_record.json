@@ -163,7 +163,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "8267.T",
@@ -177,7 +177,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "TSM",
@@ -284,6 +284,34 @@
     "entry_date": "2026-09-16",
     "entry_price": 1684.5,
     "stop_pct": 5.2,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "6501.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-17",
+    "entry_price": 5475.0,
+    "stop_pct": 5.5,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "4523.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-17",
+    "entry_price": 4953.0,
+    "stop_pct": 4.1,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
