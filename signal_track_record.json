@@ -172,12 +172,12 @@
     "entry_date": "2026-09-03",
     "entry_price": 1390.5,
     "stop_pct": 4.8,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-09-18",
+    "return_pct": -5.54,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "TSM",
