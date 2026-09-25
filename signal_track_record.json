@@ -88,12 +88,12 @@
     "entry_date": "2026-08-28",
     "entry_price": 3658.0,
     "stop_pct": 4.9,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-09-24",
+    "return_pct": -2.32,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "8411.T",
@@ -102,12 +102,12 @@
     "entry_date": "2026-08-28",
     "entry_price": 8486.0,
     "stop_pct": 5.5,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-09-24",
+    "return_pct": -2.43,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4188.T",
@@ -130,12 +130,12 @@
     "entry_date": "2026-09-02",
     "entry_price": 2902.0,
     "stop_pct": 8.5,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-09-25",
+    "return_pct": -6.79,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "QQQ",
@@ -205,7 +205,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "TQQQ",
@@ -410,6 +410,20 @@
     "entry_date": "2026-09-21",
     "entry_price": 773.5,
     "stop_pct": 1.8,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "1306.T",
+    "category": "plain_etf",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-25",
+    "entry_price": 430.3,
+    "stop_pct": 2.6,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
