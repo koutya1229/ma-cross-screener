@@ -242,12 +242,12 @@
     "entry_date": "2026-09-14",
     "entry_price": 51.73,
     "stop_pct": 19.1,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "initial"
+    "resolved": true,
+    "exit_date": "2026-09-18",
+    "return_pct": -20.78,
+    "stopped_out": true,
+    "exit_reason": "initial_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SQQQ",
@@ -256,12 +256,12 @@
     "entry_date": "2026-09-14",
     "entry_price": 39.83,
     "stop_pct": 7.7,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "initial"
+    "resolved": true,
+    "exit_date": "2026-09-21",
+    "return_pct": -14.35,
+    "stopped_out": true,
+    "exit_reason": "initial_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4568.T",
