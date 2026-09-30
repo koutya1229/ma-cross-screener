@@ -430,5 +430,19 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "GOOGL",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-09-30",
+    "entry_price": 352.015,
+    "stop_pct": 4.8,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
