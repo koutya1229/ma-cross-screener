@@ -275,7 +275,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "7267.T",
@@ -331,7 +331,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "NVDA",
@@ -345,7 +345,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "GOOGL",
@@ -359,7 +359,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "SOXX",
@@ -438,6 +438,20 @@
     "entry_date": "2026-09-30",
     "entry_price": 352.015,
     "stop_pct": 4.8,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "SPXL",
+    "category": "leveraged_bull",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-02",
+    "entry_price": 286.39,
+    "stop_pct": 5.2,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
