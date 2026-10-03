@@ -458,5 +458,47 @@
     "stopped_out": null,
     "exit_reason": null,
     "phase": "initial"
+  },
+  {
+    "ticker": "9983.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-02",
+    "entry_price": 71770.0,
+    "stop_pct": 4.8,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "4063.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-02",
+    "entry_price": 6030.0,
+    "stop_pct": 4.1,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "6954.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-02",
+    "entry_price": 6075.0,
+    "stop_pct": 5.7,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
   }
 ]
