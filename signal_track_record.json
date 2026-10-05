@@ -289,7 +289,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "6501.T",
@@ -373,7 +373,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "SMH",
@@ -387,7 +387,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "TQQQ",
@@ -401,7 +401,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "SPY",
@@ -415,7 +415,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "1306.T",
@@ -494,6 +494,20 @@
     "entry_date": "2026-10-02",
     "entry_price": 6075.0,
     "stop_pct": 5.7,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "GOOGL",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-05",
+    "entry_price": 347.1,
+    "stop_pct": 5.0,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
