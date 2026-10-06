@@ -270,12 +270,12 @@
     "entry_date": "2026-09-15",
     "entry_price": 2836.5,
     "stop_pct": 5.3,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-05",
+    "return_pct": -4.25,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "7267.T",
@@ -303,7 +303,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "4523.T",
@@ -312,12 +312,12 @@
     "entry_date": "2026-09-17",
     "entry_price": 4953.0,
     "stop_pct": 4.1,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "initial"
+    "resolved": true,
+    "exit_date": "2026-10-02",
+    "return_pct": -5.11,
+    "stopped_out": true,
+    "exit_reason": "initial_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "QQQ",
