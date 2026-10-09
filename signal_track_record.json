@@ -46,12 +46,12 @@
     "entry_date": "2026-08-27",
     "entry_price": 427.3,
     "stop_pct": 6.0,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-09",
+    "return_pct": 5.81,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SOXS",
@@ -186,12 +186,12 @@
     "entry_date": "2026-09-04",
     "entry_price": 428.91,
     "stop_pct": 5.4,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-08",
+    "return_pct": 6.78,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "9984.T",
@@ -429,7 +429,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "GOOGL",
