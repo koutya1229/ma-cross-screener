@@ -228,12 +228,12 @@
     "entry_date": "2026-09-09",
     "entry_price": 521.095,
     "stop_pct": 8.9,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-12",
+    "return_pct": 13.43,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SOXS",
@@ -368,12 +368,12 @@
     "entry_date": "2026-09-21",
     "entry_price": 559.34,
     "stop_pct": 6.4,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-12",
+    "return_pct": -2.54,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SMH",
@@ -382,12 +382,12 @@
     "entry_date": "2026-09-21",
     "entry_price": 596.03,
     "stop_pct": 5.7,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-12",
+    "return_pct": -0.77,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "TQQQ",
