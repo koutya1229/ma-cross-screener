@@ -32,12 +32,12 @@
     "entry_date": "2026-08-27",
     "entry_price": 73.3,
     "stop_pct": 8.6,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-14",
+    "return_pct": 4.28,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "TSM",
@@ -144,12 +144,12 @@
     "entry_date": "2026-09-03",
     "entry_price": 717.67,
     "stop_pct": 2.7,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-14",
+    "return_pct": 2.59,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "3382.T",
@@ -214,12 +214,12 @@
     "entry_date": "2026-09-08",
     "entry_price": 72.16,
     "stop_pct": 7.6,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-14",
+    "return_pct": 5.92,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "AMD",
@@ -326,12 +326,12 @@
     "entry_date": "2026-09-18",
     "entry_price": 721.45,
     "stop_pct": 2.6,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-14",
+    "return_pct": 2.05,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "NVDA",
@@ -340,12 +340,12 @@
     "entry_date": "2026-09-18",
     "entry_price": 222.27,
     "stop_pct": 5.8,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-14",
+    "return_pct": 0.93,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "GOOGL",
@@ -396,12 +396,12 @@
     "entry_date": "2026-09-21",
     "entry_price": 78.91,
     "stop_pct": 7.7,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-14",
+    "return_pct": -3.14,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SPY",
@@ -443,7 +443,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "SPXL",
@@ -522,6 +522,48 @@
     "entry_date": "2026-10-09",
     "entry_price": 2039.0,
     "stop_pct": 4.7,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "8001.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-14",
+    "entry_price": 2232.0,
+    "stop_pct": 4.6,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "4188.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-14",
+    "entry_price": 1187.5,
+    "stop_pct": 5.3,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "4324.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-14",
+    "entry_price": 3659.0,
+    "stop_pct": 4.3,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
