@@ -471,7 +471,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "4063.T",
@@ -485,7 +485,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "6954.T",
@@ -499,7 +499,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "GOOGL",
@@ -513,7 +513,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "7269.T",
@@ -662,6 +662,20 @@
     "entry_date": "2026-10-16",
     "entry_price": 38.9,
     "stop_pct": 7.9,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "DIA",
+    "category": "plain_etf",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-19",
+    "entry_price": 519.24,
+    "stop_pct": 1.9,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
