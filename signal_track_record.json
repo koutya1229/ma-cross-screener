@@ -354,12 +354,12 @@
     "entry_date": "2026-09-18",
     "entry_price": 349.54,
     "stop_pct": 4.8,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-21",
+    "return_pct": -5.37,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SOXX",
@@ -438,12 +438,12 @@
     "entry_date": "2026-09-30",
     "entry_price": 352.015,
     "stop_pct": 4.8,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-21",
+    "return_pct": -6.04,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SPXL",
@@ -508,12 +508,12 @@
     "entry_date": "2026-10-05",
     "entry_price": 347.1,
     "stop_pct": 5.0,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-10-21",
+    "return_pct": -4.71,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "7269.T",
@@ -704,6 +704,20 @@
     "entry_date": "2026-10-20",
     "entry_price": 4950.0,
     "stop_pct": 4.5,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "4568.T",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-10-21",
+    "entry_price": 2841.0,
+    "stop_pct": 5.0,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
