@@ -541,7 +541,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "4188.T",
@@ -550,12 +550,12 @@
     "entry_date": "2026-10-14",
     "entry_price": 1187.5,
     "stop_pct": 5.3,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "initial"
+    "resolved": true,
+    "exit_date": "2026-10-22",
+    "return_pct": -5.52,
+    "stopped_out": true,
+    "exit_reason": "initial_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4324.T",
@@ -569,7 +569,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "SOXS",
