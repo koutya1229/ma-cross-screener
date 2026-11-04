@@ -695,7 +695,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "8031.T",
@@ -709,7 +709,7 @@
     "return_pct": null,
     "stopped_out": null,
     "exit_reason": null,
-    "phase": "initial"
+    "phase": "trailing"
   },
   {
     "ticker": "4568.T",
@@ -732,6 +732,20 @@
     "entry_date": "2026-11-02",
     "entry_price": 2892.5,
     "stop_pct": 6.1,
+    "resolved": false,
+    "exit_date": null,
+    "return_pct": null,
+    "stopped_out": null,
+    "exit_reason": null,
+    "phase": "initial"
+  },
+  {
+    "ticker": "MSFT",
+    "category": "stock",
+    "signal": "ゴールデンクロス",
+    "entry_date": "2026-11-04",
+    "entry_price": 556.86,
+    "stop_pct": 5.3,
     "resolved": false,
     "exit_date": null,
     "return_pct": null,
