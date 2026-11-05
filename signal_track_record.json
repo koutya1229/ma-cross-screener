@@ -718,12 +718,12 @@
     "entry_date": "2026-10-21",
     "entry_price": 2841.0,
     "stop_pct": 5.0,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "initial"
+    "resolved": true,
+    "exit_date": "2026-10-27",
+    "return_pct": -8.68,
+    "stopped_out": true,
+    "exit_reason": "initial_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4568.T",
