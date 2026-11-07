@@ -284,12 +284,12 @@
     "entry_date": "2026-09-16",
     "entry_price": 1684.5,
     "stop_pct": 5.2,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-06",
+    "return_pct": 8.7,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "6501.T",
@@ -536,12 +536,12 @@
     "entry_date": "2026-10-14",
     "entry_price": 2232.0,
     "stop_pct": 4.6,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-06",
+    "return_pct": 0.4,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4188.T",
@@ -592,12 +592,12 @@
     "entry_date": "2026-10-15",
     "entry_price": 3029.0,
     "stop_pct": 3.7,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-06",
+    "return_pct": 10.2,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4523.T",
@@ -606,12 +606,12 @@
     "entry_date": "2026-10-15",
     "entry_price": 4868.0,
     "stop_pct": 4.3,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-06",
+    "return_pct": -0.21,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "DIA",
@@ -648,12 +648,12 @@
     "entry_date": "2026-10-16",
     "entry_price": 2049.0,
     "stop_pct": 3.9,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-06",
+    "return_pct": 5.66,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "SQQQ",
@@ -704,12 +704,12 @@
     "entry_date": "2026-10-20",
     "entry_price": 4950.0,
     "stop_pct": 4.5,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-06",
+    "return_pct": -6.67,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "4568.T",
