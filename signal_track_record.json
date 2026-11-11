@@ -690,12 +690,12 @@
     "entry_date": "2026-10-20",
     "entry_price": 2832.0,
     "stop_pct": 7.9,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-10",
+    "return_pct": 9.75,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "8031.T",
