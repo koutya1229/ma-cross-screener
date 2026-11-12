@@ -522,12 +522,12 @@
     "entry_date": "2026-10-09",
     "entry_price": 2039.0,
     "stop_pct": 4.7,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-11",
+    "return_pct": 7.31,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "8001.T",
