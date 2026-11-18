@@ -746,12 +746,12 @@
     "entry_date": "2026-11-04",
     "entry_price": 556.86,
     "stop_pct": 5.3,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "initial"
+    "resolved": true,
+    "exit_date": "2026-11-11",
+    "return_pct": -6.42,
+    "stopped_out": true,
+    "exit_reason": "initial_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "DIA",
