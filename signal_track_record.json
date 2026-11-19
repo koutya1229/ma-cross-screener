@@ -732,12 +732,12 @@
     "entry_date": "2026-11-02",
     "entry_price": 2892.5,
     "stop_pct": 6.1,
-    "resolved": false,
-    "exit_date": null,
-    "return_pct": null,
-    "stopped_out": null,
-    "exit_reason": null,
-    "phase": "trailing"
+    "resolved": true,
+    "exit_date": "2026-11-18",
+    "return_pct": -3.98,
+    "stopped_out": false,
+    "exit_reason": "trailing_stop",
+    "phase": "resolved"
   },
   {
     "ticker": "MSFT",
